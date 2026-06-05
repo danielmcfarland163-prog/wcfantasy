@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect, notFound } from 'next/navigation'
 import Nav from '@/components/Nav'
 import LeagueChat from '@/components/LeagueChat'
+import CopyInviteButton from '@/components/CopyInviteButton'
 import Link from 'next/link'
 import { generateInviteUrl } from '@/lib/utils'
 
@@ -60,12 +61,7 @@ export default async function LeaguePage({ params }: { params: Promise<{ id: str
             <div className="font-mono text-lg font-bold text-green-700 tracking-widest">
               {league.invite_code}
             </div>
-            <button
-              onClick={() => navigator.clipboard.writeText(inviteUrl)}
-              className="text-xs text-gray-400 hover:text-gray-600 mt-1"
-            >
-              Copy link
-            </button>
+            <CopyInviteButton inviteUrl={inviteUrl} />
           </div>
         </div>
 
