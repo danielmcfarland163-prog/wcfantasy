@@ -1,6 +1,7 @@
 'use client'
 import { useState, useTransition } from 'react'
-import { cn, formatKickoff, isMatchLocked, getPickResultColor, getPickResultLabel, previewPickPoints } from '@/lib/utils'
+import { cn, formatKickoff, isMatchLocked, getPickResultColor, getPickResultLabel } from '@/lib/utils'
+import { previewPickPoints } from '@/lib/scoring'
 import type { MatchWithPick } from '@/lib/types'
 
 interface Props {

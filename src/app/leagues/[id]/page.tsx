@@ -7,7 +7,8 @@ import Link from 'next/link'
 import { generateInviteUrl } from '@/lib/utils'
 
 
-export default async function LeaguePage({ params }: { params: { id: string } }) {
+export default async function LeaguePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const supabase = createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
@@ -18,7 +19,7 @@ export default async function LeaguePage({ params }: { params: { id: string } })
   const { data: membership } = await supabase
     .from('league_members')
     .select('*')
-    .eq('league_id', params.id)
+    .eq('league_id', id)
     .eq('user_id', user.id)
     .single()
 
@@ -27,7 +28,7 @@ export default async function LeaguePage({ params }: { params: { id: string } })
   const { data: league } = await supabase
     .from('leagues')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (!league) notFound()
@@ -36,7 +37,7 @@ export default async function LeaguePage({ params }: { params: { id: string } })
   const { data: scores } = await supabase
     .from('league_scores')
     .select('*, profile:profiles(username, display_name)')
-    .eq('league_id', params.id)
+    .eq('league_id', id)
     .order('total_points', { ascending: false })
 
   const isCommissioner = league.commissioner_id === user.id
@@ -112,7 +113,7 @@ export default async function LeaguePage({ params }: { params: { id: string } })
           {/* Chat */}
           <div>
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">💬 Trash talk</h2>
-            <LeagueChat leagueId={params.id} userId={user.id} username={profile?.username ?? 'you'} />
+            <LeagueChat leagueId={id} userId={user.id} username={profile?.username ?? 'you'} />
           </div>
         </div>
       </main>
