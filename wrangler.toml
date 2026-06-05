@@ -2,11 +2,3 @@ name = "wcfantasy"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".vercel/output/static"
-
-# Cron triggers — replaces vercel.json crons
-# These call your own API routes after they're deployed
-[[triggers.crons]]
-cron = "*/10 * * * *"
-
-[[triggers.crons]]
-cron = "*/15 * * * *"
