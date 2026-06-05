@@ -1,4 +1,3 @@
-export const runtime = 'edge'
 // Cron: runs daily at 6pm
 // Sends email reminders to users who have unpicked matches within 24 hours
 
