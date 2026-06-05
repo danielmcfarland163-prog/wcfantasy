@@ -1,0 +1,14 @@
+name = "wcfantasy-cron"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Cron schedules
+# */15 → sync match scores from football-data.org
+# */10 → score pending picks for finished matches
+[triggers]
+crons = ["*/15 * * * *", "*/10 * * * *"]
+
+# Secrets (set via `wrangler secret put`):
+#   CRON_SECRET   — must match the Pages app env var
+#   APP_URL       — e.g. https://wcfantasy.pages.dev

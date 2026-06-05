@@ -60,14 +60,31 @@ export default {
 4. Set route: `garageapothecary.com/world_cup2026*`
 5. Zone: `garageapothecary.com`
 
-## Step 4 — Enable Cron Triggers
+## Step 4 — Deploy the Cron Worker
 
-1. Go to **Workers & Pages → wcfantasy (your Pages project) → Settings → Triggers**
-2. Add two cron triggers:
-   - `*/10 * * * *`
-   - `*/15 * * * *`
+Cloudflare Pages does not support cron triggers. A separate Worker (`cron-worker/`) handles
+scheduling and calls the Pages API routes.
 
-These fire the `scheduled()` handler in `_worker.ts` which calls your API routes.
+```bash
+cd cron-worker
+npm install
+
+# Set the two required secrets (you'll be prompted for the value each time)
+npx wrangler secret put APP_URL
+# → enter: https://wcfantasy.pages.dev   (or your custom domain)
+
+npx wrangler secret put CRON_SECRET
+# → enter: the same random string you set as CRON_SECRET in Pages env vars
+
+# Deploy
+npm run deploy
+```
+
+That's it. The Worker fires on two schedules:
+- `*/15 * * * *` → calls `/api/sync-scores`   (fetch finished match scores)
+- `*/10 * * * *` → calls `/api/score-picks`   (score pending picks)
+
+You can verify it's running: **Cloudflare dashboard → Workers & Pages → wcfantasy-cron → Triggers**.
 
 ## Step 5 — Bootstrap match data (run once)
 

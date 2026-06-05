@@ -1,4 +1,3 @@
-export const runtime = 'edge'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import Nav from '@/components/Nav'
@@ -71,5 +70,3 @@ export default async function PicksPage() {
         <PicksClient userId={user.id} initialMatches={matchesWithPicks} />
       </main>
     </div>
-  )
-}

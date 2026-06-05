@@ -1,4 +1,3 @@
-export const runtime = 'edge'
 // Cron: runs every 5 minutes via Vercel
 // Fetches live/finished match scores from football-data.org
 // and updates the matches table in Supabase

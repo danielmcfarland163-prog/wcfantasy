@@ -1,4 +1,3 @@
-export const runtime = 'edge'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -49,5 +48,3 @@ export default async function HomePage() {
         Not affiliated with FIFA. Built for fun.
       </footer>
     </div>
-  )
-}

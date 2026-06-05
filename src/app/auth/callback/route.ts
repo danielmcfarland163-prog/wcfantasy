@@ -1,4 +1,3 @@
-export const runtime = 'edge'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -15,5 +14,4 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/auth/login?error=auth_callback_error`)
-}
+  return NextResponse.redirect(`${origin}/auth/login?error=auth_callback_erro

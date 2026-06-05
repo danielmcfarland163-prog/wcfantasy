@@ -1,4 +1,3 @@
-export const runtime = 'edge'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import Nav from '@/components/Nav'
@@ -116,5 +115,3 @@ function PodiumCard({ score, rank, featured }: { score: GlobalScore; rank: numbe
       <div className="text-sm font-bold text-green-700">{score.total_points} pts</div>
       <div className={`bg-green-600 rounded-t-lg mt-2 ${heights[rank - 1]}`} />
     </div>
-  )
-}

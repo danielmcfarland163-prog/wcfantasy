@@ -1,4 +1,3 @@
-export const runtime = 'edge'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect, notFound } from 'next/navigation'
 import Nav from '@/components/Nav'
@@ -117,6 +116,3 @@ export default async function LeaguePage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       </main>
-    </div>
-  )
-}

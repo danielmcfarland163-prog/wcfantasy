@@ -1,4 +1,3 @@
-export const runtime = 'edge'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import Nav from '@/components/Nav'
@@ -59,5 +58,3 @@ export default async function AdminPage() {
         <AdminClient initialMatches={matches ?? []} />
       </main>
     </div>
-  )
-}

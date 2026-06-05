@@ -1,4 +1,3 @@
-export const runtime = 'edge'
 // ONE-TIME SETUP: POST to this route to seed all 2026 WC matches from football-data.org
 // Call it once after deploying. Delete or protect afterwards.
 

@@ -1,4 +1,3 @@
-export const runtime = 'edge'
 // Cron: runs every 10 minutes
 // Scores all un-scored picks for finished matches
 // Updates picks, global_scores, and league_scores tables
