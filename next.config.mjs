@@ -1,3 +1,5 @@
+import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   basePath: '/worldcup2026',
@@ -11,7 +13,7 @@ const nextConfig = {
   },
 }
 
-export default nextConfig
-
-import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare'
+// Enables the OpenNext Cloudflare bindings during `next dev`
 initOpenNextCloudflareForDev()
+
+export default nextConfig

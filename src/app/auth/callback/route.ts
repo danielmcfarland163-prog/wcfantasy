@@ -10,9 +10,9 @@ export async function GET(request: NextRequest) {
     const supabase = await createServerSupabaseClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      return NextResponse.redirect(`${origin}/worldcup2026${next}`)
     }
   }
 
-  return NextResponse.redirect(`${origin}/auth/login?error=auth_callback_error`)
+  return NextResponse.redirect(`${origin}/worldcup2026/auth/login?error=auth_callback_error`)
 }

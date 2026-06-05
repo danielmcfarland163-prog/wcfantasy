@@ -26,7 +26,7 @@ export default function LoginPage() {
       if (mode === 'magic') {
         const { error } = await supabase.auth.signInWithOtp({
           email,
-          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+          options: { emailRedirectTo: `${window.location.origin}/worldcup2026/auth/callback` },
         })
         if (error) throw error
         setMessage('Check your email for a login link!')
@@ -39,7 +39,7 @@ export default function LoginPage() {
           password,
           options: {
             data: { username, display_name: username },
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: `${window.location.origin}/worldcup2026/auth/callback`,
           },
         })
         if (error) throw error

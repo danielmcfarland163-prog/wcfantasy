@@ -22,10 +22,12 @@ CREATE POLICY "Public profiles readable" ON profiles FOR SELECT USING (true);
 CREATE POLICY "Users update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
 
 -- Auto-create profile on signup
-CREATE OR REPLACE FUNCTION handle_new_user()
+-- NOTE: search_path must be pinned to public so the trigger can resolve
+-- public.profiles when firing in the context of auth.users (different schema).
+CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, username, display_name)
+  INSERT INTO public.profiles (id, username, display_name)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'username', split_part(NEW.email, '@', 1)),
@@ -33,7 +35,7 @@ BEGIN
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
@@ -166,6 +168,9 @@ CREATE TABLE leagues (
 ALTER TABLE leagues ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Authenticated users create leagues" ON leagues FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY "Commissioner updates league" ON leagues FOR UPDATE USING (auth.uid() = commissioner_id);
+-- Allows the commissioner to see the league immediately after INSERT...select(),
+-- before they've been added to league_members.
+CREATE POLICY "Commissioner can view own league" ON leagues FOR SELECT USING (auth.uid() = commissioner_id);
 
 -- =============================================
 -- LEAGUE MEMBERS
@@ -177,16 +182,26 @@ CREATE TABLE league_members (
   PRIMARY KEY (league_id, user_id)
 );
 
+-- Helper: check league membership without triggering RLS on league_members.
+-- SECURITY DEFINER runs as postgres (bypasses RLS), preventing infinite recursion
+-- in any policy that needs to verify membership.
+CREATE OR REPLACE FUNCTION public.is_league_member(p_league_id UUID)
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.league_members
+    WHERE league_id = p_league_id AND user_id = auth.uid()
+  );
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+
 ALTER TABLE league_members ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "League members visible to members" ON league_members FOR SELECT
-  USING (EXISTS (SELECT 1 FROM league_members lm WHERE lm.league_id = league_id AND lm.user_id = auth.uid()));
+  USING (public.is_league_member(league_id));
 CREATE POLICY "Users join leagues" ON league_members FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users leave leagues" ON league_members FOR DELETE USING (auth.uid() = user_id);
 
 -- leagues SELECT policy deferred until here so league_members exists
 CREATE POLICY "Public leagues readable" ON leagues FOR SELECT USING (
-  is_public = true OR
-  EXISTS (SELECT 1 FROM league_members lm WHERE lm.league_id = id AND lm.user_id = auth.uid())
+  is_public = true OR public.is_league_member(id)
 );
 
 -- =============================================
@@ -203,11 +218,10 @@ CREATE TABLE chat_messages (
 
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "League members read chat" ON chat_messages FOR SELECT
-  USING (EXISTS (SELECT 1 FROM league_members lm WHERE lm.league_id = league_id AND lm.user_id = auth.uid()));
+  USING (public.is_league_member(league_id));
 CREATE POLICY "League members post chat" ON chat_messages FOR INSERT
   WITH CHECK (
-    auth.uid() = user_id AND
-    EXISTS (SELECT 1 FROM league_members lm WHERE lm.league_id = league_id AND lm.user_id = auth.uid())
+    auth.uid() = user_id AND public.is_league_member(league_id)
   );
 CREATE POLICY "Users delete own messages" ON chat_messages FOR DELETE USING (auth.uid() = user_id);
 
@@ -229,7 +243,7 @@ CREATE TABLE league_scores (
 
 ALTER TABLE league_scores ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "League scores visible to members" ON league_scores FOR SELECT
-  USING (EXISTS (SELECT 1 FROM league_members lm WHERE lm.league_id = league_id AND lm.user_id = auth.uid()));
+  USING (public.is_league_member(league_id));
 
 -- =============================================
 -- GLOBAL SCORES (one row per user)
