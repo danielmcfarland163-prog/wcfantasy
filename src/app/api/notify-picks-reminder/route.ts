@@ -7,11 +7,10 @@ import { Resend } from 'resend'
 import { formatKickoff } from '@/lib/utils'
 import { addHours } from 'date-fns'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-const FROM = process.env.RESEND_FROM_EMAIL!
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL!
-
 export async function GET(req: NextRequest) {
+  const resend = new Resend(process.env.RESEND_API_KEY)
+  const FROM = process.env.RESEND_FROM_EMAIL!
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL!
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
