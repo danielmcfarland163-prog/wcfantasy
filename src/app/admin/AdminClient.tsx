@@ -4,12 +4,7 @@ import { createClient } from '@/lib/supabase'
 import { formatKickoff } from '@/lib/utils'
 import type { Match } from '@/lib/types'
 
-interface MatchWithTeams extends Match {
-  home_team?: { name: string; flag_emoji: string | null }
-  away_team?: { name: string; flag_emoji: string | null }
-}
-
-export default function AdminClient({ initialMatches }: { initialMatches: MatchWithTeams[] }) {
+export default function AdminClient({ initialMatches }: { initialMatches: Match[] }) {
   const supabase = createClient()
   const [matches, setMatches] = useState(initialMatches)
   const [editing, setEditing] = useState<string | null>(null)
