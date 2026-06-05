@@ -6,7 +6,7 @@ import Link from 'next/link'
 import JoinLeagueForm from './JoinLeagueForm'
 
 export default async function LeaguesPage() {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 

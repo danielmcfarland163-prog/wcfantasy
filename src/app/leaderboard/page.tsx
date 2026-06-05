@@ -6,7 +6,7 @@ import type { GlobalScore } from '@/lib/types'
 
 
 export default async function LeaderboardPage() {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 

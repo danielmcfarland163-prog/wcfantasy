@@ -8,7 +8,7 @@ import { isMatchLocked } from '@/lib/utils'
 
 
 export default async function PicksPage() {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
