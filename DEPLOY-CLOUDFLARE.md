@@ -1,111 +1,116 @@
-# Deploying to Cloudflare Pages (garageapothecary.com/world_cup2026)
+# Deploying to Cloudflare Workers (www.garageapothecary.com/worldcup2026)
 
-## Step 1 — Push to GitHub
+## Prerequisites
 
-```bash
-cd worldcup-fantasy
-git init
-git add .
-git commit -m "Initial commit"
-# Create a repo on github.com, then:
-git remote add origin https://github.com/YOUR_USERNAME/wcfantasy.git
-git push -u origin main
-```
+- `garageapothecary.com` must be on Cloudflare (DNS managed by Cloudflare)
+- Wrangler CLI authenticated: `npx wrangler login`
 
-## Step 2 — Create a Cloudflare Pages project
+---
 
-1. Go to **Cloudflare dashboard → Workers & Pages → Create → Pages**
-2. Connect your GitHub account → select the `wcfantasy` repo
-3. Set build settings:
-   - **Framework preset**: Next.js
-   - **Build command**: `npm run pages:build`
-   - **Build output directory**: `.vercel/output/static`
-4. Add all environment variables (click "Add variable" for each):
+## Step 1 — Set environment variables
+
+In your Cloudflare dashboard → **Workers & Pages → wcfantasy → Settings → Variables & Secrets**, add:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
 FOOTBALL_DATA_API_KEY
+RESEND_API_KEY
+RESEND_FROM_EMAIL
 CRON_SECRET                    # openssl rand -hex 32
-NEXT_PUBLIC_APP_URL            # https://garageapothecary.com/world_cup2026
+NEXT_PUBLIC_APP_URL            # https://www.garageapothecary.com/worldcup2026
 ```
 
-5. Click **Save and Deploy** — first build takes ~2 min.
+---
 
-## Step 3 — Add custom domain path
+## Step 2 — Deploy
 
-Cloudflare Pages doesn't support subdirectory routing natively, but since
-garageapothecary.com is already on Cloudflare you can use a Worker Route:
-
-1. Go to **Workers & Pages → Create → Worker**
-2. Name it `wcfantasy-router`, paste this code:
-
-```javascript
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url)
-    if (url.pathname.startsWith('/world_cup2026')) {
-      // Forward to your Pages project URL
-      const pagesUrl = new URL(request.url)
-      pagesUrl.hostname = 'wcfantasy.pages.dev'  // your Pages project URL
-      return fetch(pagesUrl.toString(), request)
-    }
-    return fetch(request)  // pass everything else through
-  }
-}
+```bash
+cd worldcup-fantasy
+npm install
+npm run pages:build       # builds with OpenNext
+npx wrangler deploy       # deploys to Cloudflare Workers + sets route
 ```
 
-3. Go to **Workers & Pages → your Worker → Settings → Triggers → Add Route**
-4. Set route: `garageapothecary.com/world_cup2026*`
-5. Zone: `garageapothecary.com`
+The `wrangler.toml` already has the route `www.garageapothecary.com/worldcup2026*` configured,
+so traffic to that path will be routed to this worker automatically on first deploy.
 
-## Step 4 — Deploy the Cron Worker
+---
 
-Cloudflare Pages does not support cron triggers. A separate Worker (`cron-worker/`) handles
-scheduling and calls the Pages API routes.
+## Step 3 — Deploy the Cron Worker
+
+A separate Worker (`cron-worker/`) handles scheduled score syncing and pick scoring.
 
 ```bash
 cd cron-worker
 npm install
 
-# Set the two required secrets (you'll be prompted for the value each time)
 npx wrangler secret put APP_URL
-# → enter: https://wcfantasy.pages.dev   (or your custom domain)
+# → enter: https://www.garageapothecary.com/worldcup2026
 
 npx wrangler secret put CRON_SECRET
-# → enter: the same random string you set as CRON_SECRET in Pages env vars
+# → enter: same value as CRON_SECRET above
 
-# Deploy
 npm run deploy
 ```
 
-That's it. The Worker fires on two schedules:
-- `*/15 * * * *` → calls `/api/sync-scores`   (fetch finished match scores)
-- `*/10 * * * *` → calls `/api/score-picks`   (score pending picks)
+Schedules (defined in `cron-worker/wrangler.toml`):
+- `*/15 * * * *` → calls `/api/sync-scores`
+- `*/10 * * * *` → calls `/api/score-picks`
 
-You can verify it's running: **Cloudflare dashboard → Workers & Pages → wcfantasy-cron → Triggers**.
-
-## Step 5 — Bootstrap match data (run once)
-
-```bash
-curl -X POST https://garageapothecary.com/world_cup2026/api/bootstrap-matches \
-  -H "Authorization: Bearer YOUR_CRON_SECRET"
-```
-
-## Step 6 — Grant admin access
-
-Sign up on the live app → copy your UUID from Supabase Auth → add to
-`src/app/admin/page.tsx` → push to GitHub → Cloudflare auto-redeploys.
+Verify: **Cloudflare dashboard → Workers & Pages → wcfantasy-cron → Triggers**
 
 ---
 
-## Subsequent deploys
-
-Just push to `main` — Cloudflare Pages auto-builds on every push.
+## Step 4 — Bootstrap match data (run once)
 
 ```bash
-git add .
-git commit -m "your message"
-git push
+curl -X POST https://www.garageapothecary.com/worldcup2026/api/bootstrap-matches \
+  -H "Authorization: Bearer YOUR_CRON_SECRET"
 ```
+
+---
+
+## Step 5 — Grant admin access
+
+Sign up on the live app → copy your UUID from Supabase Auth → add to
+`src/app/admin/page.tsx` → push to GitHub → redeploy.
+
+---
+
+## CI/CD (subsequent deploys)
+
+Either deploy manually:
+```bash
+npm run pages:build && npx wrangler deploy
+```
+
+Or set up GitHub Actions — create `.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run pages:build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_APP_URL: https://www.garageapothecary.com/worldcup2026
+      - run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+```
+
+Add `CLOUDFLARE_API_TOKEN` (and the Supabase secrets) to your GitHub repo under
+**Settings → Secrets and variables → Actions**.

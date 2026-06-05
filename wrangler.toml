@@ -10,3 +10,7 @@ binding = "ASSETS"
 [[services]]
 binding = "WORKER_SELF_REFERENCE"
 service = "wcfantasy"
+
+[[routes]]
+pattern = "www.garageapothecary.com/worldcup2026*"
+zone_name = "garageapothecary.com"

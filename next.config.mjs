@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  basePath: '/world_cup2026',
+  basePath: '/worldcup2026',
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co' },

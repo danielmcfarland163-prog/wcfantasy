@@ -20,8 +20,8 @@ export default {
 
     // Run both jobs on every trigger (they're idempotent and fast when nothing to do)
     const jobs = [
-      fetch(`${appUrl}/world_cup2026/api/sync-scores`, { headers }),
-      fetch(`${appUrl}/world_cup2026/api/score-picks`, { headers }),
+      fetch(`${appUrl}/worldcup2026/api/sync-scores`, { headers }),
+      fetch(`${appUrl}/worldcup2026/api/score-picks`, { headers }),
     ]
 
     const results = await Promise.allSettled(jobs)

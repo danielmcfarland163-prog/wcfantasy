@@ -75,3 +75,5 @@ export default async function LeaguesPage() {
         )}
       </main>
     </div>
+  )
+}

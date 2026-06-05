@@ -116,3 +116,6 @@ export default async function LeaguePage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       </main>
+    </div>
+  )
+}

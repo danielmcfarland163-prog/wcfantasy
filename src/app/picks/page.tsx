@@ -70,3 +70,5 @@ export default async function PicksPage() {
         <PicksClient userId={user.id} initialMatches={matchesWithPicks} />
       </main>
     </div>
+  )
+}

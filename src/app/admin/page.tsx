@@ -58,3 +58,5 @@ export default async function AdminPage() {
         <AdminClient initialMatches={matches ?? []} />
       </main>
     </div>
+  )
+}

@@ -48,3 +48,5 @@ export default async function HomePage() {
         Not affiliated with FIFA. Built for fun.
       </footer>
     </div>
+  )
+}
