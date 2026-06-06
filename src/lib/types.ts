@@ -4,7 +4,9 @@
 
 export type MatchStage = 'GROUP' | 'R32' | 'R16' | 'QF' | 'SF' | 'THIRD' | 'FINAL'
 export type MatchStatus = 'SCHEDULED' | 'LIVE' | 'FINISHED' | 'POSTPONED'
+export type WinnerPick = 'HOME' | 'DRAW' | 'AWAY'
 export type PickResult = 'EXACT' | 'CORRECT' | 'WRONG'
+export type ConfidenceMultiplier = 1 | 2 | 3
 
 export interface Profile {
   id: string
@@ -44,13 +46,17 @@ export interface Pick {
   id: string
   user_id: string
   match_id: string
+  // Scoreline prediction (My Picks core model)
   home_score_pick: number
   away_score_pick: number
-  confidence_multiplier: 1 | 2 | 3
+  confidence_multiplier: ConfidenceMultiplier
+  // Derived winner (kept for back-compat / convenience; computed from the scoreline on save)
+  winner_pick?: WinnerPick | null
   points_earned: number | null
   pick_result: PickResult | null
   scored_at: string | null
   created_at: string
+  updated_at?: string | null
   // joined
   match?: Match
 }
@@ -61,9 +67,6 @@ export interface TournamentPick {
   champion_team_id: string | null
   runner_up_team_id: string | null
   golden_boot_player: string | null
-  champion_points: number
-  runner_up_points: number
-  golden_boot_points: number
   locked: boolean
   // joined
   champion_team?: Team
@@ -88,7 +91,6 @@ export interface LeagueScore {
   user_id: string
   total_points: number
   correct_results: number
-  exact_scores: number
   picks_made: number
   rank: number
   rank_change: number
@@ -101,7 +103,6 @@ export interface GlobalScore {
   user_id: string
   total_points: number
   correct_results: number
-  exact_scores: number
   picks_made: number
   global_rank: number
   // joined
@@ -115,6 +116,22 @@ export interface ChatMessage {
   content: string
   reaction_emoji: string | null
   created_at: string
+  // joined
+  profile?: Profile
+}
+
+export interface BracketEntry {
+  user_id: string
+  group_picks: Record<string, { first: string | null; second: string | null }>
+  third_picks: Record<string, string | null>
+  third_quals: string[]
+  r32_picks: (string | null)[]
+  r16_picks: (string | null)[]
+  qf_picks: (string | null)[]
+  sf_picks: (string | null)[]
+  final_pick: string | null
+  locked: boolean
+  updated_at: string
   // joined
   profile?: Profile
 }

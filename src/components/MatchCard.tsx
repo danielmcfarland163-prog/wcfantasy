@@ -1,172 +1,340 @@
 'use client'
-import { useState, useTransition } from 'react'
-import { cn, formatKickoff, isMatchLocked, getPickResultColor, getPickResultLabel } from '@/lib/utils'
-import { previewPickPoints } from '@/lib/scoring'
-import type { MatchWithPick } from '@/lib/types'
+import { useState, type CSSProperties } from 'react'
+import { formatKickoff, isMatchLocked } from '@/lib/utils'
+import { previewPickPoints, getMatchResult } from '@/lib/scoring'
+import type { MatchWithPick, ConfidenceMultiplier, WinnerPick } from '@/lib/types'
+import Flag, { isoForTeam } from '@/components/ui/Flag'
+import LiveDot from '@/components/ui/LiveDot'
+
+export interface PickPayload {
+  home: number
+  away: number
+  confidence: ConfidenceMultiplier
+}
 
 interface Props {
   match: MatchWithPick
-  onPickSaved?: (matchId: string, home: number, away: number, multiplier: number) => void
+  onPickSaved?: (matchId: string, payload: PickPayload) => Promise<void> | void
+}
+
+const MAX_GOALS = 20
+const CONFIDENCE_OPTS: ConfidenceMultiplier[] = [1, 2, 3]
+
+function clampGoals(n: number): number {
+  if (Number.isNaN(n)) return 0
+  return Math.max(0, Math.min(MAX_GOALS, Math.trunc(n)))
 }
 
 export default function MatchCard({ match, onPickSaved }: Props) {
-  const [home, setHome] = useState(match.userPick?.home_score_pick ?? 0)
-  const [away, setAway] = useState(match.userPick?.away_score_pick ?? 0)
-  const [multiplier, setMultiplier] = useState<1|2|3>(match.userPick?.confidence_multiplier as 1|2|3 ?? 1)
-  const [saving, startTransition] = useTransition()
-  const [saved, setSaved] = useState(false)
-  const locked = match.isLocked
+  const pick = match.userPick
 
-  const { correctPts, exactPts } = previewPickPoints(home, away, multiplier)
-  const hasPick = match.userPick != null
-  const result = match.userPick?.pick_result ?? null
-  const pointsEarned = match.userPick?.points_earned ?? null
+  const savedHome = pick?.home_score_pick ?? null
+  const savedAway = pick?.away_score_pick ?? null
+  const savedConf = (pick?.confidence_multiplier ?? 1) as ConfidenceMultiplier
 
-  function handleSave() {
-    if (locked || !onPickSaved) return
-    startTransition(async () => {
-      await onPickSaved(match.id, home, away, multiplier)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    })
+  const [home, setHome] = useState<number | null>(savedHome)
+  const [away, setAway] = useState<number | null>(savedAway)
+  const [confidence, setConfidence] = useState<ConfidenceMultiplier>(savedConf)
+  const [saving, setSaving] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
+  const [error, setError] = useState(false)
+
+  const locked = isMatchLocked(match.kickoff_time) || match.status === 'LIVE' || match.status === 'FINISHED'
+  const live = match.status === 'LIVE'
+  const finished = match.status === 'FINISHED'
+  const showActual = (live || finished) && match.home_score !== null && match.away_score !== null
+  const result = pick?.pick_result ?? null
+  const hasPick = !!pick
+
+  const homeISO = isoForTeam(match.home_team?.short_code ?? '')
+  const awayISO = isoForTeam(match.away_team?.short_code ?? '')
+
+  const actualResult: WinnerPick | null =
+    match.home_score !== null && match.away_score !== null
+      ? getMatchResult(match.home_score, match.away_score)
+      : null
+
+  const bothSet = home !== null && away !== null
+  const dirty = home !== savedHome || away !== savedAway || confidence !== savedConf
+  const canSave = !locked && bothSet && dirty && !saving
+  const preview = bothSet ? previewPickPoints(home!, away!, confidence) : null
+
+  async function handleSave() {
+    if (!canSave || !onPickSaved) return
+    setSaving(true)
+    setError(false)
+    try {
+      await onPickSaved(match.id, { home: home!, away: away!, confidence })
+      setJustSaved(true)
+      setTimeout(() => setJustSaved(false), 2000)
+    } catch {
+      setError(true)
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const ScoreDisplay = ({ score, onChange, disabled }: {
-    score: number; onChange: (v: number) => void; disabled: boolean
-  }) => (
-    <div className="flex items-center gap-1.5">
-      <button
-        onClick={() => !disabled && onChange(Math.max(0, score - 1))}
-        disabled={disabled}
-        className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30 transition-colors font-bold"
-      >−</button>
-      <span className="w-8 text-center text-2xl font-bold tabular-nums">{score}</span>
-      <button
-        onClick={() => !disabled && onChange(Math.min(20, score + 1))}
-        disabled={disabled}
-        className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30 transition-colors font-bold"
-      >+</button>
-    </div>
-  )
+  const stageLabel = match.stage === 'GROUP' ? `Group ${match.group_letter}` : match.stage
+
+  const accentBorder = live
+    ? '1.5px solid var(--live)'
+    : result === 'EXACT' || result === 'CORRECT' ? '1.5px solid var(--win)'
+    : result === 'WRONG' ? '1px solid color-mix(in srgb, var(--live) 30%, var(--line))'
+    : '1px solid var(--line)'
 
   return (
-    <div className={cn(
-      'card p-4 transition-all',
-      locked && 'bg-gray-50',
-      result === 'EXACT' && 'ring-2 ring-emerald-400',
-      result === 'CORRECT' && 'ring-2 ring-blue-300',
-      result === 'WRONG' && 'ring-1 ring-red-200',
-    )}>
-      {/* Stage / group */}
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-          {match.stage === 'GROUP' ? `Group ${match.group_letter}` : match.stage}
+    <div style={{
+      background: 'var(--surface)',
+      border: accentBorder,
+      borderRadius: 16,
+      padding: '13px 14px',
+      boxShadow: live ? '0 6px 18px -8px rgba(224,60,44,0.35)' : '0 1px 2px rgba(20,22,40,0.04)',
+    }}>
+      {/* Header: stage + status */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <span style={{ fontFamily: 'var(--f-mono)', fontSize: 9.5, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+          {stageLabel}
         </span>
-        <span className="text-xs text-gray-400">{formatKickoff(match.kickoff_time)}</span>
+        {live ? (
+          <span className="wc-live-badge"><LiveDot size={5} color="#fff" /> LIVE</span>
+        ) : finished ? (
+          <span style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--ink-3)', background: 'var(--surface-2)', borderRadius: 6, padding: '2px 7px' }}>FT</span>
+        ) : locked ? (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--ink-3)', background: 'var(--surface-2)', borderRadius: 6, padding: '2px 7px' }}>
+            <LockIcon size={9} /> LOCKED
+          </span>
+        ) : (
+          <span style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 10%, transparent)', borderRadius: 6, padding: '2px 7px' }}>
+            {formatKickoff(match.kickoff_time)}
+          </span>
+        )}
       </div>
 
-      {/* Teams row */}
-      <div className="flex items-center justify-between gap-2">
+      {/* Teams + center (actual score OR steppers) */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: locked ? 4 : 10 }}>
         {/* Home team */}
-        <div className="flex-1 text-right">
-          <div className="font-semibold text-gray-900 text-sm">{match.home_team?.name ?? '?'}</div>
-          <div className="text-lg">{match.home_team?.flag_emoji ?? '🏳'}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+          <Flag iso={homeISO} size={34} radius={8} alt={match.home_team?.name ?? ''} />
+          <span style={{ fontFamily: 'var(--f-mono)', fontWeight: 700, fontSize: 11, color: 'var(--ink)', letterSpacing: 0.5 }}>
+            {match.home_team?.short_code ?? '?'}
+          </span>
         </div>
 
-        {/* Score input / result */}
-        <div className="flex flex-col items-center gap-1 px-2">
-          {locked && match.home_score !== null ? (
-            // Actual result
-            <div className="flex items-center gap-3">
-              <span className="text-2xl font-bold text-gray-800">{match.home_score}</span>
-              <span className="text-gray-400 text-sm">–</span>
-              <span className="text-2xl font-bold text-gray-800">{match.away_score}</span>
+        {/* Center */}
+        <div style={{ textAlign: 'center', minWidth: showActual || !locked ? 96 : 40 }}>
+          {showActual ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <ScoreNum n={match.home_score!} />
+              <span style={{ fontFamily: 'var(--f-cond)', fontWeight: 300, fontSize: 18, color: 'var(--ink-3)' }}>:</span>
+              <ScoreNum n={match.away_score!} />
             </div>
+          ) : locked ? (
+            <span style={{ fontFamily: 'var(--f-mono)', fontSize: 11, color: 'var(--ink-3)' }}>vs</span>
           ) : (
-            // Pick input
-            <div className="flex items-center gap-2">
-              <ScoreDisplay score={home} onChange={setHome} disabled={locked} />
-              <span className="text-gray-400 font-medium">–</span>
-              <ScoreDisplay score={away} onChange={setAway} disabled={locked} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Stepper value={home} onChange={setHome} label={`${match.home_team?.short_code ?? 'home'} score`} />
+              <span style={{ fontFamily: 'var(--f-cond)', fontWeight: 300, fontSize: 18, color: 'var(--ink-3)', paddingTop: 2 }}>:</span>
+              <Stepper value={away} onChange={setAway} label={`${match.away_team?.short_code ?? 'away'} score`} />
             </div>
-          )}
-
-          {/* Status label */}
-          {match.status === 'LIVE' && (
-            <span className="badge bg-red-100 text-red-700 animate-pulse">● LIVE</span>
-          )}
-          {locked && match.status !== 'LIVE' && match.status !== 'FINISHED' && (
-            <span className="badge bg-gray-100 text-gray-500">Locked</span>
           )}
         </div>
 
         {/* Away team */}
-        <div className="flex-1 text-left">
-          <div className="font-semibold text-gray-900 text-sm">{match.away_team?.name ?? '?'}</div>
-          <div className="text-lg">{match.away_team?.flag_emoji ?? '🏳'}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+          <Flag iso={awayISO} size={34} radius={8} alt={match.away_team?.name ?? ''} />
+          <span style={{ fontFamily: 'var(--f-mono)', fontWeight: 700, fontSize: 11, color: 'var(--ink)', letterSpacing: 0.5 }}>
+            {match.away_team?.short_code ?? '?'}
+          </span>
         </div>
       </div>
 
-      {/* User's pick + result */}
-      {locked && hasPick && (
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-xs text-gray-500">
-            Your pick: <span className="font-semibold">{match.userPick!.home_score_pick}–{match.userPick!.away_score_pick}</span>
-            {' '}×{match.userPick!.confidence_multiplier}
-          </span>
-          <div className="flex items-center gap-2">
-            {result && (
-              <span className={cn('badge text-xs', getPickResultColor(result))}>
-                {getPickResultLabel(result)}
-              </span>
-            )}
-            {pointsEarned !== null && (
-              <span className="text-sm font-bold text-green-700">+{pointsEarned} pts</span>
-            )}
+      {/* OPEN: confidence selector + save */}
+      {!locked && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0 10px' }}>
+            <span style={{ fontFamily: 'var(--f-mono)', fontSize: 9, letterSpacing: 0.5, color: 'var(--ink-3)', textTransform: 'uppercase', flexShrink: 0 }}>
+              Confidence
+            </span>
+            <div style={{ display: 'flex', gap: 6, flex: 1 }}>
+              {CONFIDENCE_OPTS.map(c => {
+                const on = confidence === c
+                return (
+                  <button
+                    key={c}
+                    onClick={() => setConfidence(c)}
+                    aria-pressed={on}
+                    style={{
+                      flex: 1, cursor: 'pointer', padding: '6px 4px', borderRadius: 9,
+                      border: on ? '1.5px solid var(--accent)' : '1.5px solid var(--line)',
+                      background: on ? 'color-mix(in srgb, var(--accent) 12%, var(--surface))' : 'var(--surface)',
+                      color: on ? 'var(--accent)' : 'var(--ink-3)',
+                      fontFamily: 'var(--f-body)', fontWeight: on ? 800 : 600, fontSize: 13,
+                      transition: 'all .12s',
+                    }}
+                  >
+                    {c}×
+                  </button>
+                )
+              })}
+            </div>
           </div>
-        </div>
+
+          <button
+            onClick={handleSave}
+            disabled={!canSave}
+            style={{
+              width: '100%', padding: '10px 4px', borderRadius: 11, border: 'none',
+              cursor: canSave ? 'pointer' : 'default',
+              background: justSaved ? 'color-mix(in srgb, var(--win) 14%, var(--surface))'
+                : canSave ? 'var(--accent)' : 'var(--surface-2)',
+              color: justSaved ? 'var(--win)' : canSave ? '#fff' : 'var(--ink-3)',
+              fontFamily: 'var(--f-body)', fontWeight: 700, fontSize: 13.5,
+              transition: 'all .15s',
+            }}
+          >
+            {saving ? 'Saving…' : justSaved ? '✓ Saved' : hasPick ? (dirty ? 'Update pick' : 'Saved · tap to edit') : 'Save pick'}
+          </button>
+
+          {preview && (
+            <div style={{ marginTop: 7, textAlign: 'center', fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--ink-3)', letterSpacing: 0.2 }}>
+              +{preview.correctPts} correct&nbsp;·&nbsp;+{preview.exactPts} exact
+              {confidence > 1 && <span style={{ color: 'var(--accent)' }}>&nbsp;({confidence}× applied)</span>}
+            </div>
+          )}
+
+          {error && (
+            <div style={{ marginTop: 7, textAlign: 'center', fontFamily: 'var(--f-body)', fontSize: 11.5, color: 'var(--live)' }}>
+              Couldn’t save — check your connection and try again.
+            </div>
+          )}
+        </>
       )}
 
-      {/* Pick controls (not locked) */}
-      {!locked && (
-        <div className="mt-4 border-t border-gray-100 pt-3 flex items-center justify-between gap-3">
-          {/* Multiplier */}
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-gray-500 mr-1">Confidence:</span>
-            {([1, 2, 3] as const).map(m => (
-              <button
-                key={m}
-                onClick={() => setMultiplier(m)}
-                className={cn(
-                  'w-7 h-7 rounded-full text-xs font-bold transition-colors',
-                  multiplier === m
-                    ? 'bg-green-600 text-white'
-                    : 'border border-gray-300 text-gray-600 hover:bg-gray-100'
-                )}
-              >
-                {m}×
-              </button>
-            ))}
-          </div>
-
-          {/* Potential pts + save */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400">
-              {correctPts}–{exactPts} pts
-            </span>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className={cn(
-                'btn-primary py-1.5 px-3 text-xs',
-                saved && 'bg-emerald-600'
+      {/* LOCKED: your prediction + result */}
+      {locked && (
+        <div style={{ marginTop: 8 }}>
+          {hasPick ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--ink-3)', letterSpacing: 0.3 }}>
+                YOUR PICK
+              </span>
+              <span style={{ fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 15, color: 'var(--ink)' }}>
+                {savedHome}–{savedAway}
+              </span>
+              {savedConf > 1 && (
+                <span style={{ fontFamily: 'var(--f-mono)', fontSize: 10, fontWeight: 700, color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 10%, transparent)', borderRadius: 5, padding: '1px 5px' }}>
+                  {savedConf}×
+                </span>
               )}
-            >
-              {saved ? '✓ Saved' : saving ? 'Saving…' : hasPick ? 'Update' : 'Save pick'}
-            </button>
-          </div>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', fontFamily: 'var(--f-body)', fontSize: 12, color: 'var(--ink-3)' }}>
+              No pick made
+            </div>
+          )}
+
+          {/* Result badge */}
+          {result && (
+            <div style={{
+              marginTop: 9, padding: '9px 12px', borderRadius: 11,
+              background: result === 'WRONG'
+                ? 'color-mix(in srgb, var(--live) 10%, transparent)'
+                : 'color-mix(in srgb, var(--win) 14%, transparent)',
+              border: `1.5px solid ${result === 'WRONG'
+                ? 'color-mix(in srgb, var(--live) 28%, var(--line))'
+                : 'color-mix(in srgb, var(--win) 32%, var(--line))'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+            }}>
+              {result === 'WRONG' ? (
+                <>
+                  <span style={{ fontFamily: 'var(--f-mono)', fontWeight: 800, fontSize: 15, color: 'var(--live)', lineHeight: 1 }}>✗</span>
+                  <span style={{ fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 15, color: 'var(--live)', letterSpacing: 0.5 }}>WRONG</span>
+                  {actualResult && (
+                    <span style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--ink-3)' }}>
+                      ·&nbsp;{actualResult === 'HOME' ? match.home_team?.short_code : actualResult === 'AWAY' ? match.away_team?.short_code : 'Draw'} won
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span style={{ fontFamily: 'var(--f-mono)', fontWeight: 800, fontSize: 15, color: 'var(--win)', lineHeight: 1 }}>
+                    {result === 'EXACT' ? '⊛' : '✓'}
+                  </span>
+                  <span style={{ fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 15, color: 'var(--win)', letterSpacing: 0.5 }}>
+                    {result === 'EXACT' ? 'EXACT SCORE' : 'CORRECT'}
+                  </span>
+                  <span style={{ fontFamily: 'var(--f-mono)', fontSize: 11, fontWeight: 800, color: 'var(--win)' }}>
+                    +{pick?.points_earned ?? 0} pts
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Live, not yet scored */}
+          {live && !result && (
+            <div style={{ marginTop: 9, textAlign: 'center', fontFamily: 'var(--f-body)', fontSize: 11.5, color: 'var(--live)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+              <LiveDot size={5} color="var(--live)" /> In play — result pending
+            </div>
+          )}
         </div>
       )}
     </div>
+  )
+}
+
+// ── Sub-components ──────────────────────────────────────────────────────────
+
+function ScoreNum({ n }: { n: number }) {
+  return (
+    <span style={{ fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 28, lineHeight: 1, color: 'var(--ink)' }}>{n}</span>
+  )
+}
+
+function Stepper({ value, onChange, label }: { value: number | null; onChange: (n: number) => void; label: string }) {
+  const v = value ?? 0
+  const btn: CSSProperties = {
+    width: 30, height: 22, border: '1px solid var(--line)', background: 'var(--surface)',
+    color: 'var(--ink-2)', cursor: 'pointer', display: 'flex', alignItems: 'center',
+    justifyContent: 'center', fontSize: 13, lineHeight: 1, padding: 0,
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+      <button
+        type="button" aria-label={`Increase ${label}`}
+        onClick={() => onChange(clampGoals(v + 1))}
+        style={{ ...btn, borderRadius: '9px 9px 0 0', borderBottom: 'none' }}
+      >▲</button>
+      <input
+        inputMode="numeric"
+        aria-label={label}
+        value={value === null ? '' : String(value)}
+        onChange={e => {
+          const raw = e.target.value.replace(/[^0-9]/g, '')
+          if (raw === '') return onChange(0)
+          onChange(clampGoals(parseInt(raw, 10)))
+        }}
+        style={{
+          width: 44, height: 40, textAlign: 'center', border: '1.5px solid var(--line)',
+          fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 26, color: 'var(--ink)',
+          background: 'var(--surface)', outline: 'none', padding: 0, borderRadius: 0,
+          MozAppearance: 'textfield',
+        }}
+      />
+      <button
+        type="button" aria-label={`Decrease ${label}`}
+        onClick={() => onChange(clampGoals(v - 1))}
+        style={{ ...btn, borderRadius: '0 0 9px 9px', borderTop: 'none' }}
+      >▼</button>
+    </div>
+  )
+}
+
+function LockIcon({ size = 10 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
   )
 }

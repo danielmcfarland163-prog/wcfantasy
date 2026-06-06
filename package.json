@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "pages:build": "opennextjs-cloudflare build",
-    "pages:deploy": "opennextjs-cloudflare deploy",
+    "pages:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview"
   },
   "dependencies": {

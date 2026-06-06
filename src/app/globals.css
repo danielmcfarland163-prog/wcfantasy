@@ -2,30 +2,254 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── GOAL26 Design Tokens ─────────────────────────────────────── */
+:root {
+  /* Light theme */
+  --bg:        #f4f5f9;
+  --surface:   #ffffff;
+  --surface-2: #f2f4f8;
+  --ink:       #1c1e2e;
+  --ink-2:     #4a4e68;
+  --ink-3:     #878da8;
+  --line:      #e4e7f0;
+  --navy:      #2a304a;
+  --match-bg:  #171a2b;
+
+  /* Accent (default blue; tweakable via inline style --accent) */
+  --accent:    #2f6fe0;
+  --accent-l:  color-mix(in srgb, var(--accent) 72%, white);
+
+  /* Semantic / always-on */
+  --live:      #e03c2c;
+  --win:       #1f9d5a;
+  --gold:      #c98a1a;
+
+  /* Typography */
+  --f-cond:    'Barlow Condensed', system-ui, sans-serif;
+  --f-body:    'Barlow', system-ui, sans-serif;
+  --f-mono:    'Space Mono', 'Courier New', monospace;
+}
+
+[data-theme="dark"] {
+  --bg:        #161929;
+  --surface:   #1e2138;
+  --surface-2: #262b42;
+  --ink:       #f0f1fb;
+  --ink-2:     #b8bcda;
+  --ink-3:     #7880a2;
+  --line:      #2e3350;
+  --navy:      #1d2036;
+}
+
+/* ── Keyframe animations ──────────────────────────────────────── */
+@keyframes wc-ping {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(2.2); opacity: 0; }
+}
+@keyframes wc-hero-glow {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%       { opacity: 0.85; transform: scale(1.08); }
+}
+@keyframes wc-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.wc-ping {
+  animation: wc-ping 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+[data-pulse="energetic"] .wc-ping {
+  animation-duration: 0.9s;
+}
+[data-pulse="off"] .wc-ping {
+  animation: none;
+}
+
+.wc-hero-glow {
+  animation: wc-hero-glow 2.4s ease-in-out infinite;
+}
+[data-pulse="off"] .wc-hero-glow {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wc-ping, .wc-hero-glow { animation: none; }
+}
+
+.wc-fade-in {
+  animation: wc-fade-in 0.2s ease-out both;
+}
+
+/* ── Scrollbar hide ───────────────────────────────────────────── */
+.wc-noscroll::-webkit-scrollbar { display: none; }
+.wc-noscroll { scrollbar-width: none; -ms-overflow-style: none; }
+
+/* ── Responsive Layout ────────────────────────────────────────── */
+
+/* Desktop sidebar — hidden on mobile, visible on md+ */
+.wc-sidebar {
+  display: none;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 224px;
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  z-index: 30;
+}
+@media (min-width: 768px) {
+  .wc-sidebar { display: flex; }
+}
+
+/* Mobile bottom nav — hidden on desktop */
+.wc-mobile-nav { flex-shrink: 0; }
+@media (min-width: 768px) {
+  .wc-mobile-nav { display: none; }
+}
+
+/* Page content — max-width on desktop */
+.wc-page-inner { width: 100%; }
+@media (min-width: 768px) {
+  .wc-page-inner { max-width: 840px; margin: 0 auto; }
+}
+
+/* ── Base ─────────────────────────────────────────────────────── */
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-  }
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--f-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* safe area for iOS notch / home indicator */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* mobile-optimized root */
+  html {
+    -webkit-text-size-adjust: 100%;
   }
 }
 
+/* ── Component classes (keep existing, add GOAL26 variants) ───── */
 @layer components {
+  /* Keep for auth pages */
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-bold text-white
+      focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all;
+    background: var(--accent);
+    box-shadow: 0 6px 14px -6px var(--accent);
+  }
+  .btn-primary:hover {
+    filter: brightness(1.08);
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 transition-colors;
+    @apply inline-flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-medium
+      focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 transition-colors;
+    border-color: var(--line);
+    background: var(--surface);
+    color: var(--ink-2);
   }
   .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    @apply rounded-2xl shadow-sm;
   }
   .input {
-    @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500;
+    @apply w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--ink);
+  }
+  .input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
   }
   .badge {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  /* ── GOAL26 atoms ─────────────────────────────────────────────── */
+  .wc-eyebrow {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .wc-title {
+    font-family: var(--f-cond);
+    font-weight: 800;
+    font-size: 32px;
+    letter-spacing: -0.2px;
+    color: var(--ink);
+    margin: 2px 0 0;
+    line-height: 1.05;
+  }
+  .wc-section-head {
+    font-family: var(--f-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+  .wc-score {
+    font-family: var(--f-cond);
+    font-weight: 800;
+    line-height: 1;
+  }
+  .wc-team-name {
+    font-family: var(--f-body);
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--ink);
+  }
+  .wc-live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--live);
+    color: #fff;
+    border-radius: 7px;
+    padding: 3px 8px;
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+  }
+  .wc-icon-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--ink-2);
+    position: relative;
+    transition: background 0.15s;
+  }
+  .wc-icon-btn:hover {
+    background: var(--surface-2);
+  }
+  .wc-dark-icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #fff;
   }
 }

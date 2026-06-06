@@ -25,15 +25,15 @@ type CronRoute = {
  * Add more entries here if you add more schedules in wrangler.toml.
  */
 const CRON_MAP: Record<string, CronRoute> = {
-  '*/15 * * * *': { path: '/api/sync-scores',  label: 'sync-scores'  },
-  '*/10 * * * *': { path: '/api/score-picks',  label: 'score-picks'  },
+  // Score bracket picks every 15 minutes during the tournament
+  '*/15 * * * *': { path: '/api/score-bracket', label: 'score-bracket' },
 }
 
 async function callRoute(env: Env, route: CronRoute): Promise<void> {
   const url = `${env.APP_URL}${route.path}`
 
   const res = await fetch(url, {
-    method: 'GET',
+    method: 'POST',
     headers: {
       Authorization: `Bearer ${env.CRON_SECRET}`,
       'Content-Type': 'application/json',

@@ -1,4 +1,4 @@
-// Server-side Supabase client (for Server Components, API routes, middleware)
+// Server-side Supabase client (for Server Components, API routes)
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
@@ -10,20 +10,25 @@ export async function createServerSupabaseClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) { return cookieStore.get(name)?.value },
-        set(name: string, value: string, options: CookieOptions) {
-          try { cookieStore.set({ name, value, ...options }) } catch {}
+        getAll() {
+          return cookieStore.getAll()
         },
-        remove(name: string, options: CookieOptions) {
-          try { cookieStore.set({ name, value: '', ...options }) } catch {}
+        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+          // In Server Components the cookie store is read-only and .set() throws.
+          // Session refresh is handled in middleware, so it's safe to ignore here.
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {}
         },
       },
     }
   )
 }
 
-// Admin client — uses service role key, bypasses RLS
-// ONLY use in server-side API routes, never expose to client
+// Admin client — uses service role key, bypasses RLS.
+// ONLY use in server-side API routes, never expose to the client.
 export function createAdminSupabaseClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

@@ -1,74 +1,83 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
-import Nav from '@/components/Nav'
+import AppShell from '@/components/AppShell'
 import PicksClient from './PicksClient'
-import type { Match, Pick, Team } from '@/lib/types'
+import type { MatchWithPick } from '@/lib/types'
 import { isMatchLocked } from '@/lib/utils'
-
+import { format } from 'date-fns'
 
 export default async function PicksPage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  // Fetch matches with teams
   const { data: matches } = await supabase
     .from('matches')
-    .select(`
-      *,
-      home_team:teams!matches_home_team_id_fkey(*),
-      away_team:teams!matches_away_team_id_fkey(*)
-    `)
+    .select('*, home_team:teams!matches_home_team_id_fkey(*), away_team:teams!matches_away_team_id_fkey(*)')
     .order('kickoff_time', { ascending: true })
 
-  // Fetch user's picks
   const { data: picks } = await supabase
     .from('picks')
     .select('*')
     .eq('user_id', user.id)
 
-  // Merge picks into matches
-  const picksMap = new Map((picks ?? []).map(p => [p.match_id, p]))
-  const matchesWithPicks = (matches ?? []).map(m => ({
+  const { data: myScore } = await supabase
+    .from('global_scores')
+    .select('total_points, global_rank, correct_results')
+    .eq('user_id', user.id)
+    .single()
+
+  const picksByMatch = Object.fromEntries((picks ?? []).map(p => [p.match_id, p]))
+  const matchesWithPicks: MatchWithPick[] = (matches ?? []).map(m => ({
     ...m,
-    userPick: picksMap.get(m.id) ?? undefined,
+    userPick: picksByMatch[m.id],
     isLocked: isMatchLocked(m.kickoff_time),
   }))
 
-  // User's summary stats
-  const totalPoints = (picks ?? []).reduce((sum, p) => sum + (p.points_earned ?? 0), 0)
-  const exactScores = (picks ?? []).filter(p => p.pick_result === 'EXACT').length
-  const correctResults = (picks ?? []).filter(p => p.pick_result === 'CORRECT' || p.pick_result === 'EXACT').length
-  const totalPicked = (picks ?? []).filter(p => p.match_id).length
+  // Each picks row represents a saved scoreline prediction
+  const totalPicked = (picks ?? []).length
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Nav username={profile?.username ?? 'you'} />
+    <AppShell>
+      <div style={{ paddingBottom: 28 }}>
+        {/* Header */}
+        <div style={{ padding: '8px 20px 14px' }}>
+          <div className="wc-eyebrow">FAN PICKS</div>
+          <h1 className="wc-title">My Predictions</h1>
+        </div>
 
-      <main className="max-w-2xl mx-auto px-4 py-6">
-        {/* Stats banner */}
-        <div className="grid grid-cols-4 gap-3 mb-6">
-          {[
-            { label: 'Points', value: totalPoints, color: 'text-green-700' },
-            { label: 'Picked', value: totalPicked, color: 'text-gray-700' },
-            { label: 'Correct', value: correctResults, color: 'text-blue-700' },
-            { label: 'Exact', value: exactScores, color: 'text-emerald-700' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="card p-3 text-center">
-              <div className={`text-2xl font-bold ${color}`}>{value}</div>
-              <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+        {/* Stat header card */}
+        <div style={{
+          margin: '0 20px',
+          borderRadius: 20,
+          padding: '18px 18px 16px',
+          color: '#fff',
+          background: 'linear-gradient(135deg, var(--navy), color-mix(in srgb, var(--navy) 65%, var(--accent)))',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, letterSpacing: 1, opacity: 0.7 }}>GLOBAL RANK</div>
+              <div style={{ fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 34, lineHeight: 1 }}>
+                {myScore?.global_rank ? `#${myScore.global_rank}` : '—'}
+              </div>
+              <div style={{ fontFamily: 'var(--f-body)', fontSize: 11.5, opacity: 0.75 }}>
+                {myScore ? `${myScore.total_points} pts · ${myScore.correct_results} correct` : 'Make picks to start scoring'}
+              </div>
             </div>
-          ))}
+            <div style={{ width: 1, height: 48, background: 'rgba(255,255,255,0.18)' }} />
+            <div style={{ textAlign: 'center', paddingLeft: 4 }}>
+              <div style={{ fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 28, color: '#fff' }}>
+                {totalPicked}
+              </div>
+              <div style={{ fontFamily: 'var(--f-mono)', fontSize: 9, letterSpacing: 0.5, opacity: 0.7 }}>
+                PICKS MADE
+              </div>
+            </div>
+          </div>
         </div>
 
         <PicksClient userId={user.id} initialMatches={matchesWithPicks} />
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }

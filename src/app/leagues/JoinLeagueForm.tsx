@@ -1,10 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 export default function JoinLeagueForm({ userId }: { userId: string }) {
-  const supabase = createClient()
   const router = useRouter()
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,57 +13,51 @@ export default function JoinLeagueForm({ userId }: { userId: string }) {
     setLoading(true)
     setError('')
 
-    const { data: league, error: leagueErr } = await supabase
-      .from('leagues')
-      .select('id, name, max_members')
-      .eq('invite_code', code.trim().toUpperCase())
-      .single()
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? '/worldcup2026'
+    const res = await fetch(`${base}/api/join-league`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invite_code: code }),
+    })
 
-    if (leagueErr || !league) {
-      setError('League not found. Check the invite code.')
+    const data = await res.json()
+
+    if (!res.ok) {
+      setError(data.error ?? 'Could not join league. Try again.')
       setLoading(false)
       return
     }
 
-    const { error: joinErr } = await supabase
-      .from('league_members')
-      .insert({ league_id: league.id, user_id: userId })
-
-    if (joinErr) {
-      if (joinErr.code === '23505') {
-        setError("You're already in this league!")
-      } else {
-        setError('Could not join league. Try again.')
-      }
-      setLoading(false)
-      return
-    }
-
-    // Also upsert into league_scores
-    await supabase.from('league_scores').upsert({
-      league_id: league.id,
-      user_id: userId,
-      total_points: 0,
-    }, { onConflict: 'league_id,user_id' })
-
-    router.push(`/leagues/${league.id}`)
+    router.push(`/leagues/${data.leagueId}`)
     router.refresh()
   }
 
   return (
-    <form onSubmit={handleJoin} className="flex gap-2">
-      <input
-        type="text"
-        value={code}
-        onChange={e => setCode(e.target.value.toUpperCase())}
-        placeholder="Enter invite code (e.g. AB12CD34)"
-        maxLength={8}
-        className="input flex-1 font-mono tracking-widest"
-      />
-      <button type="submit" disabled={loading || code.length < 6} className="btn-primary whitespace-nowrap">
-        {loading ? 'Joining…' : 'Join'}
-      </button>
-    </form>
+    <div>
+      <form onSubmit={handleJoin} style={{ display: 'flex', gap: 8 }}>
+        <input
+          type="text"
+          value={code}
+          onChange={e => setCode(e.target.value.toUpperCase())}
+          placeholder="Enter invite code"
+          maxLength={8}
+          className="input flex-1"
+          style={{ fontFamily: 'var(--f-mono)', letterSpacing: '0.15em', textTransform: 'uppercase' }}
+        />
+        <button
+          type="submit"
+          disabled={loading || code.length < 6}
+          className="btn-primary"
+          style={{ whiteSpace: 'nowrap' }}
+        >
+          {loading ? 'Joining…' : 'Join'}
+        </button>
+      </form>
+      {error && (
+        <p style={{ fontFamily: 'var(--f-body)', fontSize: 13, color: 'var(--live)', marginTop: 8 }}>
+          {error}
+        </p>
+      )}
+    </div>
   )
-  if (error) return <p className="text-sm text-red-600 mt-2">{error}</p>
 }

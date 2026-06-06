@@ -1,0 +1,176 @@
+// =============================================
+// BRACKET SCORING — single source of truth
+// =============================================
+// Used by BOTH the server scoring engine (lib/score-utils.ts → api/score-bracket)
+// AND the UI (BracketClient summary, BracketReviewer) so points never drift.
+//
+// Point values follow GDD §2.2 / the bracket deployment spec exactly:
+//   Group 1st correct          2
+//   Group 2nd correct          2
+//   3rd-place qualifier        2
+//   Round of 32 winner         3
+//   Round of 16 winner         5
+//   Quarter-final winner       8
+//   Semi-final winner         13
+//   Final winner (champion)   21
+//
+// This module is intentionally dependency-free (no '@/' imports) so it can be
+// imported from anywhere and unit-tested in isolation.
+
+export const BRACKET_PTS = {
+  group1st: 2,
+  group2nd: 2,
+  third: 2,
+  r32: 3,
+  r16: 5,
+  qf: 8,
+  sf: 13,
+  champion: 21,
+} as const
+
+// Static maximum slot counts per section (used for "X / Y correct" displays).
+export const BRACKET_TOTALS = {
+  group1st: 12,
+  group2nd: 12,
+  groups: 24, // 1st + 2nd across 12 groups
+  third: 8,
+  r32: 16,
+  r16: 8,
+  qf: 4,
+  sf: 2,
+  final: 1,
+} as const
+
+export interface BracketEntryLike {
+  group_picks?: Record<string, { first?: string | null; second?: string | null }> | null
+  third_quals?: (string | null)[] | null
+  r32_picks?: (string | null)[] | null
+  r16_picks?: (string | null)[] | null
+  qf_picks?: (string | null)[] | null
+  sf_picks?: (string | null)[] | null
+  final_pick?: string | null
+}
+
+export interface TournamentResultsLike {
+  group_results?: Record<string, { first?: string | null; second?: string | null; third?: string | null }> | null
+  third_quals?: (string | null)[] | null
+  r32_results?: (string | null)[] | null
+  r16_results?: (string | null)[] | null
+  qf_results?: (string | null)[] | null
+  sf_results?: (string | null)[] | null
+  final_result?: string | null
+}
+
+export interface BreakdownRow {
+  key: 'groups' | 'third' | 'r32' | 'r16' | 'qf' | 'sf' | 'final'
+  label: string
+  correct: number
+  total: number      // static max slot count for the section
+  points: number     // points actually earned
+  hasResults: boolean // whether any actual result exists for this section yet
+}
+
+export interface BracketScore {
+  points: number          // total bracket points earned
+  correct: number         // total correct picks across all sections
+  championCorrect: number // 1 if the Final pick is correct, else 0
+  picksMade: number       // completeness count (how many slots the user filled)
+  breakdown: BreakdownRow[]
+}
+
+function arr(x: (string | null)[] | null | undefined): (string | null)[] {
+  return Array.isArray(x) ? x : []
+}
+
+/**
+ * Score a single bracket entry against the (possibly partial) tournament results.
+ * Rounds with no results yet simply contribute 0 — there is no penalty for
+ * future rounds that haven't been played.
+ */
+export function scoreBracketEntry(
+  entry: BracketEntryLike,
+  results: TournamentResultsLike | null | undefined,
+): BracketScore {
+  const gp = entry.group_picks ?? {}
+  const gr = results?.group_results ?? {}
+  const groupKeys = Object.keys(gr)
+
+  // ── Group stage (1st + 2nd) ──
+  let group1st = 0
+  let group2nd = 0
+  for (const gk of groupKeys) {
+    const actual = gr[gk]
+    if (!actual) continue
+    if (actual.first && gp[gk]?.first === actual.first) group1st++
+    if (actual.second && gp[gk]?.second === actual.second) group2nd++
+  }
+  const groupsHasResults = groupKeys.length > 0
+  const groupsCorrect = group1st + group2nd
+  const groupsPoints = group1st * BRACKET_PTS.group1st + group2nd * BRACKET_PTS.group2nd
+
+  // ── 3rd-place qualifiers ──
+  const actualThird = arr(results?.third_quals)
+  let third = 0
+  for (const nm of arr(entry.third_quals)) {
+    if (nm && actualThird.includes(nm)) third++
+  }
+  const thirdHasResults = actualThird.some(Boolean)
+  const thirdPoints = third * BRACKET_PTS.third
+
+  // ── Knockout rounds ──
+  const scoreRound = (
+    picks: (string | null)[] | null | undefined,
+    actuals: (string | null)[] | null | undefined,
+    ptVal: number,
+  ): { correct: number; points: number; hasResults: boolean } => {
+    const p = arr(picks)
+    const a = arr(actuals)
+    let correct = 0
+    p.forEach((pick, i) => {
+      if (pick && a[i] && pick === a[i]) correct++
+    })
+    return { correct, points: correct * ptVal, hasResults: a.some(Boolean) }
+  }
+
+  const r32 = scoreRound(entry.r32_picks, results?.r32_results, BRACKET_PTS.r32)
+  const r16 = scoreRound(entry.r16_picks, results?.r16_results, BRACKET_PTS.r16)
+  const qf = scoreRound(entry.qf_picks, results?.qf_results, BRACKET_PTS.qf)
+  const sf = scoreRound(entry.sf_picks, results?.sf_results, BRACKET_PTS.sf)
+
+  // ── Champion (Final) ──
+  const finalResult = results?.final_result ?? null
+  const championCorrect = entry.final_pick && finalResult && entry.final_pick === finalResult ? 1 : 0
+  const finalPoints = championCorrect * BRACKET_PTS.champion
+  const finalHasResults = !!finalResult
+
+  const points = groupsPoints + thirdPoints + r32.points + r16.points + qf.points + sf.points + finalPoints
+  const correct = groupsCorrect + third + r32.correct + r16.correct + qf.correct + sf.correct + championCorrect
+
+  // ── Completeness (picks made) ──
+  const groupsFilled = Object.values(gp).filter((p) => p?.first && p?.second).length * 2
+  const knockoutFilled = [
+    ...arr(entry.r32_picks),
+    ...arr(entry.r16_picks),
+    ...arr(entry.qf_picks),
+    ...arr(entry.sf_picks),
+  ].filter(Boolean).length
+  const picksMade =
+    groupsFilled + arr(entry.third_quals).filter(Boolean).length + knockoutFilled + (entry.final_pick ? 1 : 0)
+
+  const breakdown: BreakdownRow[] = [
+    { key: 'groups', label: 'Group stage', correct: groupsCorrect, total: BRACKET_TOTALS.groups, points: groupsPoints, hasResults: groupsHasResults },
+    { key: 'third', label: '3rd-place', correct: third, total: BRACKET_TOTALS.third, points: thirdPoints, hasResults: thirdHasResults },
+    { key: 'r32', label: 'Round of 32', correct: r32.correct, total: BRACKET_TOTALS.r32, points: r32.points, hasResults: r32.hasResults },
+    { key: 'r16', label: 'Round of 16', correct: r16.correct, total: BRACKET_TOTALS.r16, points: r16.points, hasResults: r16.hasResults },
+    { key: 'qf', label: 'Quarter-finals', correct: qf.correct, total: BRACKET_TOTALS.qf, points: qf.points, hasResults: qf.hasResults },
+    { key: 'sf', label: 'Semi-finals', correct: sf.correct, total: BRACKET_TOTALS.sf, points: sf.points, hasResults: sf.hasResults },
+    { key: 'final', label: 'Final', correct: championCorrect, total: BRACKET_TOTALS.final, points: finalPoints, hasResults: finalHasResults },
+  ]
+
+  return { points, correct, championCorrect, picksMade, breakdown }
+}
+
+// Theoretical maximum bracket score (every pick correct):
+//   groups 24×2=48 · third 8×2=16 · r32 16×3=48 · r16 8×5=40
+//   qf 4×8=32 · sf 2×13=26 · final 1×21=21  →  TOTAL 231
+export const BRACKET_MAX_POINTS = 231

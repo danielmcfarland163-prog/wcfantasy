@@ -5,3 +5,8 @@ node_modules/
 .vercel/
 *.tsbuildinfo
 .open-next/
+
+# local exports / stale build output
+World Cup 2026/
+World Cup 2026.zip
+dist/

@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
-import Nav from '@/components/Nav'
+import AppShell from '@/components/AppShell'
 import Link from 'next/link'
 import JoinLeagueForm from './JoinLeagueForm'
 
@@ -9,71 +9,82 @@ export default async function LeaguesPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-
-  // Get user's leagues with member count + their score
   const { data: memberships } = await supabase
     .from('league_members')
-    .select(`
-      league:leagues(
-        id, name, description, invite_code, commissioner_id, created_at,
-        member_count:league_members(count)
-      )
-    `)
+    .select('league:leagues(id, name, description, invite_code, commissioner_id, created_at, member_count:league_members(count))')
     .eq('user_id', user.id)
 
   const leagues = memberships?.map(m => m.league).filter(Boolean) ?? []
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Nav username={profile?.username ?? 'you'} />
-
-      <main className="max-w-2xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">👥 My Leagues</h1>
-          <Link href="/leagues/create" className="btn-primary">
-            + Create league
+    <AppShell>
+      <div style={{ paddingBottom: 28 }}>
+        <div style={{ padding: '8px 20px 14px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+          <div>
+            <div className="wc-eyebrow">PRIVATE COMPETITION</div>
+            <h1 className="wc-title">My Leagues</h1>
+          </div>
+          <Link
+            href="/leagues/create"
+            style={{
+              textDecoration: 'none', padding: '8px 16px', borderRadius: 12,
+              background: 'var(--accent)', color: '#fff',
+              fontFamily: 'var(--f-body)', fontWeight: 700, fontSize: 13,
+            }}
+          >
+            + Create
           </Link>
         </div>
 
         {/* Join league */}
-        <div className="card p-4 mb-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">Join a league</h2>
+        <div style={{ margin: '0 20px 20px', padding: '16px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 16 }}>
+          <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, letterSpacing: 0.8, color: 'var(--ink-3)', marginBottom: 10 }}>
+            JOIN WITH CODE
+          </div>
           <JoinLeagueForm userId={user.id} />
         </div>
 
-        {/* League list */}
         {leagues.length === 0 ? (
-          <div className="card p-8 text-center text-gray-400">
-            <div className="text-4xl mb-2">🏟️</div>
-            <p className="font-medium text-gray-600">No leagues yet</p>
-            <p className="text-sm mt-1">Create one or ask a friend for their invite code.</p>
+          <div style={{ margin: '12px 20px', padding: '32px 20px', textAlign: 'center', background: 'var(--surface)', border: '1px dashed var(--line)', borderRadius: 18 }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>🏟️</div>
+            <div style={{ fontFamily: 'var(--f-cond)', fontWeight: 700, fontSize: 18, color: 'var(--ink)' }}>No leagues yet</div>
+            <div style={{ fontFamily: 'var(--f-body)', fontSize: 13, color: 'var(--ink-3)', marginTop: 4 }}>
+              Create one or ask a friend for their invite code
+            </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 20px' }}>
             {leagues.map((league: any) => (
               <Link
                 key={league.id}
                 href={`/leagues/${league.id}`}
-                className="card p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                style={{
+                  textDecoration: 'none', display: 'flex', alignItems: 'center', padding: '14px 16px',
+                  background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 16,
+                  boxShadow: '0 1px 2px rgba(20,22,40,0.04)',
+                }}
               >
-                <div>
-                  <div className="font-semibold text-gray-900">{league.name}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: 'var(--f-body)', fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>
+                    {league.name}
+                  </div>
                   {league.description && (
-                    <div className="text-sm text-gray-500 mt-0.5">{league.description}</div>
+                    <div style={{ fontFamily: 'var(--f-body)', fontSize: 12.5, color: 'var(--ink-3)', marginTop: 2 }}>
+                      {league.description}
+                    </div>
                   )}
-                  <div className="text-xs text-gray-400 mt-1">
-                    {league.member_count?.[0]?.count ?? 0} members · Code: {league.invite_code}
+                  <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--ink-3)', marginTop: 4 }}>
+                    {league.member_count?.[0]?.count ?? 0} members · CODE: {league.invite_code}
                   </div>
                 </div>
-                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 6l6 6-6 6"/>
                 </svg>
               </Link>
             ))}
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }
