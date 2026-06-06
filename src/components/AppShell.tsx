@@ -20,7 +20,11 @@ export default async function AppShell({ children, dark, fullBleed }: AppShellPr
   return (
     <div
       style={{
-        height: '100svh',
+        // Pin the shell to the viewport (out of normal flow) so the page itself
+        // never scrolls — only the inner content column does. Avoids the few-px
+        // body scroll that 100svh can cause from sub-pixel rounding.
+        position: 'fixed',
+        inset: 0,
         display: 'flex',
         overflow: 'hidden',
         background: dark ? 'var(--match-bg)' : 'var(--bg)',
