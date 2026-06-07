@@ -6,7 +6,7 @@ import Link from 'next/link'
 
 type Mode = 'magic' | 'login' | 'signup'
 
-const CALLBACK = '/worldcup2026/auth/callback'
+const CALLBACK = '/soccer-fantasy/auth/callback'
 
 export default function LoginPage() {
   const supabase = createClient()
@@ -108,7 +108,7 @@ export default function LoginPage() {
             letterSpacing: -0.5,
           }}
         >
-          World Cup Fantasy 2026
+          Soccer Fantasy Game
         </h1>
         <p
           style={{

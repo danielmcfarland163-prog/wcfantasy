@@ -1,5 +1,5 @@
 /**
- * wcfantasy-cron
+ * soccer-fantasy-cron
  *
  * Standalone Cloudflare Worker that fires on several schedules and calls the
  * Next.js API routes deployed with the app. Each schedule runs an ordered list
@@ -7,8 +7,8 @@
  *
  * Required secrets (set via `wrangler secret put`):
  *   APP_URL      — base URL of the deployment INCLUDING the basePath, no trailing slash.
- *                  For this app that is:  https://www.garageapothecary.com/worldcup2026
- *                  (The Next app uses basePath '/worldcup2026', so API routes live at
+ *                  For this app that is:  https://www.garageapothecary.com/soccer-fantasy
+ *                  (The Next app uses basePath '/soccer-fantasy', so API routes live at
  *                   <APP_URL>/api/...  — omitting the basePath makes every call 404.)
  *   CRON_SECRET  — must match CRON_SECRET in the app's runtime env.
  */
@@ -58,8 +58,8 @@ async function callRoute(env: Env, step: Step): Promise<void> {
 
 // Run steps in order; a failing step is logged but does not abort the rest.
 async function runSteps(env: Env, steps: Step[]): Promise<void> {
-  if (!env.APP_URL?.includes('/worldcup2026')) {
-    console.warn(`[cron] APP_URL "${env.APP_URL}" is missing the /worldcup2026 basePath — calls will 404.`)
+  if (!env.APP_URL?.includes('/soccer-fantasy')) {
+    console.warn(`[cron] APP_URL "${env.APP_URL}" is missing the /soccer-fantasy basePath — calls will 404.`)
   }
   for (const step of steps) {
     try {

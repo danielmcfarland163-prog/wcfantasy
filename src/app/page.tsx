@@ -20,7 +20,7 @@ export default async function HomePage() {
             USA · CANADA · MEXICO
           </div>
           <h1 style={{ fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 44, letterSpacing: -0.5, color: '#fff', margin: '0 0 8px' }}>
-            World Cup<br />Fantasy 2026
+            Soccer Fantasy<br />Game
           </h1>
           <p style={{ fontFamily: 'var(--f-body)', fontSize: 15, color: 'rgba(255,255,255,0.7)', maxWidth: 280, margin: '0 auto 36px' }}>
             Fill your bracket, pick match winners, climb the leaderboard, trash talk your friends.

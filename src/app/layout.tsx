@@ -24,13 +24,13 @@ const spaceMono = Space_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'World Cup Fantasy 2026',
+  title: 'Soccer Fantasy Game',
   description: 'Fill your bracket, climb the leaderboard, trash talk your friends.',
   icons: {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>",
   },
   openGraph: {
-    title: 'World Cup Fantasy 2026',
+    title: 'Soccer Fantasy Game',
     description: 'Fill your bracket, climb the leaderboard, trash talk your friends.',
     type: 'website',
   },

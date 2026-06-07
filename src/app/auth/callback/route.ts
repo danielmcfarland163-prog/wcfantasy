@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const BASE = '/worldcup2026'
+const BASE = '/soccer-fantasy'
 
 // Handles the redirect target of magic links and email confirmations.
 // Exchanges the one-time code for a session, then routes the user to

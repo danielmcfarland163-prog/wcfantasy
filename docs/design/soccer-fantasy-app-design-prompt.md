@@ -1,8 +1,8 @@
-# World Cup App — Design Prompt for Claude
+# Soccer Fantasy Game — Design Prompt
 
 ## Overview
 
-Design a mobile-first World Cup companion app that serves as the ultimate fan experience during a FIFA World Cup tournament. The app should cover the full tournament lifecycle — from group stage through the final — delivering real-time updates, rich statistics, and social engagement in a fast, visually compelling interface.
+Design a mobile-first soccer tournament companion app that serves as the ultimate fan experience during a major international soccer tournament. The app should cover the full tournament lifecycle — from group stage through the final — delivering real-time updates, rich statistics, and social engagement in a fast, visually compelling interface.
 
 ---
 
@@ -25,7 +25,7 @@ Design a mobile-first World Cup companion app that serves as the ultimate fan ex
 ### 3. Team Profiles
 - Full squad roster with player photos, positions, ages, caps, and club affiliations
 - Tournament stats: goals scored/conceded, possession averages, disciplinary record
-- Historical World Cup performance summary
+- Historical tournament performance summary
 - Upcoming and past match results for the tournament
 
 ### 4. Player Stats & Leaderboards
@@ -79,7 +79,7 @@ Design a mobile-first World Cup companion app that serves as the ultimate fan ex
 
 ## Technical Constraints & Notes
 
-- Data source: FIFA official API or a licensed sports data provider (Opta, StatsBomb)
+- Data source: an official or licensed sports data provider (Opta, StatsBomb, football-data.org)
 - Offline mode: cache last-known standings and schedule for users without connectivity
 - Notifications: opt-in per team, per match type (goals only vs. all events)
 - Localization: support at minimum English, Spanish, French, Portuguese, and Arabic (RTL)

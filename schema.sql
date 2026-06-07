@@ -1,5 +1,5 @@
 -- =============================================
--- WORLD CUP FANTASY 2026 — SUPABASE SCHEMA
+-- SOCCER FANTASY GAME — SUPABASE SCHEMA
 -- Run this in the Supabase SQL editor
 -- =============================================
 
@@ -319,7 +319,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE global_scores;
 ALTER PUBLICATION supabase_realtime ADD TABLE matches;
 
 -- =============================================
--- SEED: 2026 WORLD CUP GROUPS A-L
+-- SEED: TOURNAMENT GROUPS A-L
 -- (48 teams, 12 groups of 4)
 -- Add your actual team data here
 -- =============================================

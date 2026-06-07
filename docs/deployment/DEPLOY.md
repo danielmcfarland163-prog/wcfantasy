@@ -1,4 +1,4 @@
-# Deploying World Cup Fantasy 2026
+# Deploying Soccer Fantasy Game
 
 ## Stack
 - **Next.js 14** (App Router) on **Vercel**
@@ -41,7 +41,7 @@
 
 ```bash
 npm install -g vercel
-cd worldcup-fantasy
+cd soccer-fantasy-game
 vercel
 ```
 
@@ -54,7 +54,7 @@ FOOTBALL_DATA_API_KEY
 RESEND_API_KEY
 RESEND_FROM_EMAIL
 CRON_SECRET          # generate: openssl rand -hex 32
-NEXT_PUBLIC_APP_URL  # your Vercel URL, e.g. https://wcfantasy.vercel.app
+NEXT_PUBLIC_APP_URL  # your Vercel URL, e.g. https://soccer-fantasy.vercel.app
 ```
 
 ---

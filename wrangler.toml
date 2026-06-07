@@ -1,4 +1,4 @@
-name = "wcfantasy"
+name = "soccer-fantasy"
 main = ".open-next/worker.js"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
@@ -9,12 +9,12 @@ binding = "ASSETS"
 
 [[services]]
 binding = "WORKER_SELF_REFERENCE"
-service = "wcfantasy"
+service = "soccer-fantasy"
 
 [[routes]]
-pattern = "www.garageapothecary.com/worldcup2026*"
+pattern = "www.garageapothecary.com/soccer-fantasy*"
 zone_name = "garageapothecary.com"
 
 [[routes]]
-pattern = "garageapothecary.com/worldcup2026*"
+pattern = "garageapothecary.com/soccer-fantasy*"
 zone_name = "garageapothecary.com"

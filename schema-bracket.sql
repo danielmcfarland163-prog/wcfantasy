@@ -1,5 +1,5 @@
 -- =============================================
--- WORLD CUP FANTASY 2026 — BRACKET SCHEMA
+-- SOCCER FANTASY GAME — BRACKET SCHEMA
 -- Run this in the Supabase SQL editor
 -- AFTER running the original schema.sql
 -- =============================================
@@ -59,7 +59,7 @@ CREATE POLICY "Only service role updates results" ON tournament_results FOR ALL 
 -- =============================================
 
 -- =============================================
--- SEED: 48 TEAMS (all 2026 World Cup teams)
+-- SEED: 48 TEAMS (all tournament teams)
 -- short_code used as unique key
 -- =============================================
 INSERT INTO teams (name, short_code, group_letter, flag_emoji) VALUES

@@ -1,4 +1,4 @@
-# World Cup Fantasy — Deployment Plans by Feature
+# Soccer Fantasy Game — Deployment Plans by Feature
 
 **Purpose:** Individual implementation prompts for each feature gap  
 **Prerequisite:** Run `VERIFICATION-AUDIT.md` to generate gap analysis first  
@@ -32,7 +32,7 @@ CRITICAL (Must-have for launch)          HIGH (Should-have)                LOW (
 ```
 DEPLOYMENT PROMPT: Auth & Onboarding
 
-Build a complete authentication and onboarding flow for World Cup Fantasy.
+Build a complete authentication and onboarding flow for Soccer Fantasy Game.
 
 **Scope:**
 1. Supabase Auth integration (magic link or OAuth)
@@ -463,7 +463,7 @@ Bracket mode:
 ```
 DEPLOYMENT PROMPT: Cloudflare Workers Deployment
 
-Deploy the World Cup Fantasy app to Cloudflare Workers with database and environment config.
+Deploy the Soccer Fantasy Game app to Cloudflare Workers with database and environment config.
 
 **Scope:**
 1. Configure OpenNext adapter for Cloudflare
@@ -491,7 +491,7 @@ Deploy the World Cup Fantasy app to Cloudflare Workers with database and environ
 - [ ] Preview locally: npm run preview
 - [ ] Test all routes (auth, picks, bracket, leagues, etc.)
 - [ ] Deploy: npm run pages:deploy
-- [ ] Set up custom domain (worldcup-fantasy.example.com)
+- [ ] Set up custom domain (soccer-fantasy-game.example.com)
 - [ ] Configure SSL/TLS
 - [ ] Set up cron jobs (see Cron Jobs section)
 - [ ] Monitor logs and errors

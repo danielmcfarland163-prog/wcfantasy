@@ -1,4 +1,4 @@
-# World Cup Fantasy
+# Soccer Fantasy Game
 
 **Genre:** Sports Companion App  
 **Stack:** Next.js · TypeScript · Tailwind CSS  
@@ -7,13 +7,13 @@
 
 ## Quick Links
 - [Game Design Document](docs/GDD.md)
-- [Design Prompt](docs/design/world-cup-app-design-prompt.md)
+- [Design Prompt](docs/design/soccer-fantasy-app-design-prompt.md)
 - [Deployment Guide](docs/deployment/DEPLOY-CLOUDFLARE.md)
 - [Changelog](docs/CHANGELOG.md)
 
 ## Structure
 ```
-worldcup-fantasy/
+soccer-fantasy-game/
 ├── docs/
 │   ├── GDD.md                        Product Design Document
 │   ├── CHANGELOG.md

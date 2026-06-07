@@ -1,4 +1,4 @@
-# World Cup Fantasy — Gap Analysis Report (Re-Verified)
+# Soccer Fantasy Game — Gap Analysis Report (Re-Verified)
 
 **Audit date:** 2026-06-06 (afternoon re-run)
 **Scope:** Full V&V across all 20 dimensions of `docs/VERIFICATION-AUDIT.md`
@@ -65,7 +65,7 @@ Status: ✅ Complete · 🟡 Partial · ❌ Missing/Broken · 🔴 Blocker. % = 
 ## 2. Completed features (production-ready or nearly so)
 
 - **Auth & onboarding (95%).** Magic-link, password, and signup with branded UI; middleware forces username setup via an `onboarded` flag mirrored into the profile row and JWT; `handle_new_user` trigger guarantees the profile exists; cookie sessions refresh per request; logout in `SideNav`/`AccountMenu`. 2 onboarded profiles live.
-- **Architecture (95%).** Clean App Router, separate SSR/browser/admin clients, `basePath:/worldcup2026` threaded through the auth callback, OpenNext→Workers, GitHub Actions deploy. (Real files valid; not recompiled in-sandbox — see caveat.)
+- **Architecture (95%).** Clean App Router, separate SSR/browser/admin clients, `basePath:/soccer-fantasy` threaded through the auth callback, OpenNext→Workers, GitHub Actions deploy. (Real files valid; not recompiled in-sandbox — see caveat.)
 - **Scoring engine (88%).** `lib/scoring.ts` + `lib/bracket-scoring.ts` are pure, single-source-of-truth modules shared by the server scorer **and** UI. Verified reconciled on live data: user A 93 (71 picks + 22 bracket, rank 1), user B 75 (71 + 4, rank 2) — **identical across `league_scores` and `global_scores`**.
 - **Bracket engine + locks (88%).** Sequential Groups → 3rd-place → Knockout → Summary with cascade-clearing derived progression, 8-of-12 third-place logic, `LockCountdown` escalating to a live timer inside 24h, read-only post-lock view, and a `BracketReviewer` scoring ✓/✗. **The lock is enforced server-side by an RLS time check** (verified) — a genuine strength.
 - **Admin panel (80%).** Page + every admin route gated; full match simulator (group/bracket/full/reset w/ auto-scoring), pick reset, user/league CRUD, correct HTTP verbs.
@@ -88,10 +88,10 @@ Status: ✅ Complete · 🟡 Partial · ❌ Missing/Broken · 🔴 Blocker. % = 
 The automation/realtime/live work that closes the prior report's critical path **exists only in the local working tree**:
 - **Untracked (never committed):** `src/app/api/sync-fixtures/route.ts`, `src/components/RealtimeRefresh.tsx`, `src/lib/api-auth.ts`.
 - **Tracked but modified (uncommitted):** `cron-worker/src/index.ts` + `wrangler.toml` (the schedule rewrite), `sync-scores`, `score-picks`, `today/live/stats/LeagueClient`, GDD/CHANGELOG (+122/−203 across 17 files).
-- **Deployed state lags:** app Worker `wcfantasy` was deployed at 18:18 UTC from commit `b4becaa1` (which **predates** these edits); cron Worker `wcfantasy-cron` was last modified **Jun 5 03:10** (pre-rewrite). `deploy.yml` runs `wrangler deploy` for the **app only** — it never `cd cron-worker && wrangler deploy`, and injects **no runtime secrets** (`SUPABASE_SERVICE_ROLE_KEY`, `FOOTBALL_DATA_API_KEY`, `CRON_SECRET`, `RESEND_*`).
+- **Deployed state lags:** app Worker `soccer-fantasy` was deployed at 18:18 UTC from commit `b4becaa1` (which **predates** these edits); cron Worker `soccer-fantasy-cron` was last modified **Jun 5 03:10** (pre-rewrite). `deploy.yml` runs `wrangler deploy` for the **app only** — it never `cd cron-worker && wrangler deploy`, and injects **no runtime secrets** (`SUPABASE_SERVICE_ROLE_KEY`, `FOOTBALL_DATA_API_KEY`, `CRON_SECRET`, `RESEND_*`).
 - **Git is corrupted** (`improper chunk offset(s) 6d7f0 and 992d8`); a `recovery-backup-worktree-2026-06-06.tgz` is on disk.
 
-**Action:** repair/repack the git object store (or restore from the recovery tarball), commit the untracked + modified files, deploy the app, **separately deploy the cron Worker**, and set runtime secrets on **both** Workers via `wrangler secret put`. Confirm the cron `APP_URL` carries the `/worldcup2026` basePath (the worker already warns if it doesn't). **Effort: 0.5–1d.** *Blocks all live behavior; until done, prod runs the pre-fix app and the stale cron.*
+**Action:** repair/repack the git object store (or restore from the recovery tarball), commit the untracked + modified files, deploy the app, **separately deploy the cron Worker**, and set runtime secrets on **both** Workers via `wrangler secret put`. Confirm the cron `APP_URL` carries the `/soccer-fantasy` basePath (the worker already warns if it doesn't). **Effort: 0.5–1d.** *Blocks all live behavior; until done, prod runs the pre-fix app and the stale cron.*
 
 ### 4.2 [Critical] Tournament data integrity
 Live DB has a **duplicate Uruguay**: `URY` (api_id 758, **no group**) and `URU` (group **H**, **no api_id**) — the legacy `seed-teams` (hardcoded/grouped/no api_id) vs API-sourced rows. `teams` = 49 (should be 48). Only **72 group matches**, all `FINISHED` (simulated); **0 knockout rows**. **Action:** merge the two Uruguay rows onto one record carrying both `group_letter='H'` and `api_id=758`, add a uniqueness guard, then run `sync-fixtures` against the live API after the draw to populate knockouts. **Effort: 0.5–1d** (knockouts are timing-bound to the real draw).

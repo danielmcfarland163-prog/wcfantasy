@@ -1,8 +1,8 @@
 {
-  "name": "worldcup-2026",
+  "name": "soccer-fantasy-bracket",
   "compatibility_date": "2026-06-04",
 
-  // Serve the worldcup.html from the public folder
+  // Serve the soccer-fantasy-bracket.html from the public folder
   "assets": {
     "directory": "./public"
   },
@@ -10,12 +10,12 @@
   // Route on your domain — runs alongside the main garageapothecary.com site
   "routes": [
     {
-      "pattern": "garageapothecary.com/worldcup",
+      "pattern": "garageapothecary.com/soccer-fantasy-bracket",
       "zone_name": "garageapothecary.com",
       "custom_domain": false
     },
     {
-      "pattern": "garageapothecary.com/worldcup/*",
+      "pattern": "garageapothecary.com/soccer-fantasy-bracket/*",
       "zone_name": "garageapothecary.com",
       "custom_domain": false
     }

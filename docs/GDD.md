@@ -1,4 +1,4 @@
-# World Cup Fantasy — Product Design Document
+# Soccer Fantasy Game — Product Design Document
 
 **Version:** 0.2  
 **Last Updated:** 2026-06-05  
@@ -9,9 +9,9 @@
 
 ## 1. Concept
 
-A mobile-first World Cup companion app delivering the full tournament experience — real-time scores, rich statistics, bracket tracking, and social engagement — from group stage through the final.
+A mobile-first soccer tournament companion app delivering the full tournament experience — real-time scores, rich statistics, bracket tracking, and social engagement — from group stage through the final.
 
-See [`design/world-cup-app-design-prompt.md`](design/world-cup-app-design-prompt.md) for the original design brief.
+See [`design/soccer-fantasy-app-design-prompt.md`](design/soccer-fantasy-app-design-prompt.md) for the original design brief.
 
 ---
 

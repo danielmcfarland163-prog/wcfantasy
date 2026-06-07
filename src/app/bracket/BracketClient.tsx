@@ -717,7 +717,7 @@ function SummaryTab({ state, onGoTo, results, locked, submitted, onSubmit }: { s
                 ✗ Winner was {teamByName(results.final_result).f} {results.final_result}
               </div>
             )}
-            <div style={{ fontFamily:'var(--f-mono)', fontSize:10, letterSpacing:'2px', color: isCorrect === true ? 'var(--win)' : 'var(--gold)', fontWeight:700, marginBottom:4 }}>YOUR 2026 WORLD CUP CHAMPION</div>
+            <div style={{ fontFamily:'var(--f-mono)', fontSize:10, letterSpacing:'2px', color: isCorrect === true ? 'var(--win)' : 'var(--gold)', fontWeight:700, marginBottom:4 }}>YOUR TOURNAMENT CHAMPION</div>
             <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:28, color:'var(--ink)' }}>{state.final}</div>
           </div>
         )

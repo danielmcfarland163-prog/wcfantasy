@@ -1,4 +1,4 @@
-# World Cup Fantasy — Gap Analysis Report (Verified)
+# Soccer Fantasy Game — Gap Analysis Report (Verified)
 
 **Audit date:** 2026-06-06
 **Scope:** Full V&V across all 20 dimensions of `docs/VERIFICATION-AUDIT.md`
@@ -54,7 +54,7 @@ Status: ✅ Complete · 🟡 Partial · ❌ Missing/Broken. % = approximate comp
 
 **Authentication & onboarding (95%).** Three sign-in modes (magic link, password, signup) with a branded UI and friendly error prettifying; middleware forces username setup via an `onboarded` flag mirrored into both the `profiles` row and the JWT; the `handle_new_user` DB trigger guarantees the profile row exists before onboarding writes to it (so the onboarding `update` is safe); cookie sessions refresh on every request; logout is present in `SideNav` and `AccountMenu`. The live DB holds 2 onboarded profiles.
 
-**Architecture & setup (95%).** Clean App-Router project, separate SSR/browser/admin Supabase clients, `basePath: /worldcup2026` threaded through the auth callback, OpenNext→Cloudflare-Workers build, GitHub Actions deploy. TypeScript `strict` is on and `tsc --noEmit` passes with **zero errors**. All 13 tables exist with RLS enabled.
+**Architecture & setup (95%).** Clean App-Router project, separate SSR/browser/admin Supabase clients, `basePath: /soccer-fantasy` threaded through the auth callback, OpenNext→Cloudflare-Workers build, GitHub Actions deploy. TypeScript `strict` is on and `tsc --noEmit` passes with **zero errors**. All 13 tables exist with RLS enabled.
 
 **Scoring math & engine (85%).** `lib/scoring.ts` and `lib/bracket-scoring.ts` are pure, dependency-free, single-source-of-truth modules shared by the server scorer *and* the UI, so values never drift. Picks score 0 / 3 / 5 × confidence; brackets score 2/2/2/3/5/8/13/21 (max 231), matching GDD §2.2 exactly. Verified correct and **reconciled** on live data: two users at 93 and 75 points, identical across `global_scores` and `league_scores`, with global ranks populated.
 
@@ -80,7 +80,7 @@ Status: ✅ Complete · 🟡 Partial · ❌ Missing/Broken. % = approximate comp
 
 The build and security blockers from the prior draft are cleared, so the critical path is shorter and concentrated in automation and data:
 
-1. **[Critical] Wire automated live-sync + scoring (dim 7/8/18).** Today the cron worker maps only `*/15 → POST /api/score-bracket`; the declared `*/10` trigger has **no handler**, and `sync-scores` / `score-picks` / `notify-picks-reminder` are never called on any schedule. Additionally, `sync-scores` never sets `LIVE` and queries FINISHED only. Fix the `CRON_MAP`, add a `LIVE`/in-play branch to the sync, confirm the cron `APP_URL` includes the `/worldcup2026` basePath, and ensure runtime Worker secrets (`SUPABASE_SERVICE_ROLE_KEY`, `FOOTBALL_DATA_API_KEY`, `CRON_SECRET`) are set — the GH Actions workflow only injects `NEXT_PUBLIC_*`. **Effort: 1–2 days.** *Blocks the live experience and any hands-off scoring.*
+1. **[Critical] Wire automated live-sync + scoring (dim 7/8/18).** Today the cron worker maps only `*/15 → POST /api/score-bracket`; the declared `*/10` trigger has **no handler**, and `sync-scores` / `score-picks` / `notify-picks-reminder` are never called on any schedule. Additionally, `sync-scores` never sets `LIVE` and queries FINISHED only. Fix the `CRON_MAP`, add a `LIVE`/in-play branch to the sync, confirm the cron `APP_URL` includes the `/soccer-fantasy` basePath, and ensure runtime Worker secrets (`SUPABASE_SERVICE_ROLE_KEY`, `FOOTBALL_DATA_API_KEY`, `CRON_SECRET`) are set — the GH Actions workflow only injects `NEXT_PUBLIC_*`. **Effort: 1–2 days.** *Blocks the live experience and any hands-off scoring.*
 2. **[Critical] Tournament data integrity (dim 3).** The live DB has a **duplicate Uruguay** (`URY`, api_id 758, no group **and** `URU`, no api_id, group H) caused by the `seed-teams` (hardcoded, grouped, no api_id) vs `bootstrap-matches` (API, api_id, no group) collision. Only **72 group matches** are seeded — no knockout match rows exist (expected until the draw, but nothing generates them yet). Dedupe teams, choose one seed-of-record, and add knockout-match generation. **Effort: 1–2 days** (knockout generation is timing-bound to the real draw).
 3. **[High → Critical if v1] Tournament bonus picks (dim 9).** GDD §2.1 promises one-time Champion (10) / Runner-up (5) / Golden Boot (5) picks locked at group-stage end. Only an unused type and config constants exist — no UI, no scoring. If this is a v1 commitment it is a blocker; otherwise it is the top post-launch item. **Effort: 1–2 days.**
 
@@ -164,7 +164,7 @@ RLS is enabled on all 13 tables, every API route checks `CRON_SECRET` or an admi
 3. Add Vitest unit tests for `scoring.ts` + `bracket-scoring.ts` and a CI test step. — **3–4h**
 
 **Phase 2 — Make it live (~3–4 days, critical path)**
-4. Rewrite the cron worker: map every schedule, call `sync-scores` → `score-picks` → `score-bracket`, add a `LIVE`/in-play branch to `sync-scores`, and confirm `APP_URL` carries the `/worldcup2026` basePath. Set all runtime Worker secrets. *(blocks live launch)* — **1–2d**
+4. Rewrite the cron worker: map every schedule, call `sync-scores` → `score-picks` → `score-bracket`, add a `LIVE`/in-play branch to `sync-scores`, and confirm `APP_URL` carries the `/soccer-fantasy` basePath. Set all runtime Worker secrets. *(blocks live launch)* — **1–2d**
 5. Add knockout-match generation after the group stage / draw. — **1–2d**
 6. Wire client realtime subscriptions on `/live`, `/today`, league standings, and the global board (publication already exists). — **1d**
 

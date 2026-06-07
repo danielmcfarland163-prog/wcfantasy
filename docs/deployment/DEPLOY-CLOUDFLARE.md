@@ -1,4 +1,4 @@
-# Deploying to Cloudflare Workers (www.garageapothecary.com/worldcup2026)
+# Deploying to Cloudflare Workers (www.garageapothecary.com/soccer-fantasy)
 
 ## Prerequisites
 
@@ -9,7 +9,7 @@
 
 ## Step 1 — Set environment variables
 
-In your Cloudflare dashboard → **Workers & Pages → wcfantasy → Settings → Variables & Secrets**, add:
+In your Cloudflare dashboard → **Workers & Pages → soccer-fantasy → Settings → Variables & Secrets**, add:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL
@@ -19,7 +19,7 @@ FOOTBALL_DATA_API_KEY
 RESEND_API_KEY
 RESEND_FROM_EMAIL
 CRON_SECRET                    # openssl rand -hex 32
-NEXT_PUBLIC_APP_URL            # https://www.garageapothecary.com/worldcup2026
+NEXT_PUBLIC_APP_URL            # https://www.garageapothecary.com/soccer-fantasy
 ```
 
 ---
@@ -27,13 +27,13 @@ NEXT_PUBLIC_APP_URL            # https://www.garageapothecary.com/worldcup2026
 ## Step 2 — Deploy
 
 ```bash
-cd worldcup-fantasy
+cd soccer-fantasy-game
 npm install
 npm run pages:build       # builds with OpenNext
 npx wrangler deploy       # deploys to Cloudflare Workers + sets route
 ```
 
-The `wrangler.toml` already has the route `www.garageapothecary.com/worldcup2026*` configured,
+The `wrangler.toml` already has the route `www.garageapothecary.com/soccer-fantasy*` configured,
 so traffic to that path will be routed to this worker automatically on first deploy.
 
 ---
@@ -47,7 +47,7 @@ cd cron-worker
 npm install
 
 npx wrangler secret put APP_URL
-# → enter: https://www.garageapothecary.com/worldcup2026
+# → enter: https://www.garageapothecary.com/soccer-fantasy
 
 npx wrangler secret put CRON_SECRET
 # → enter: same value as CRON_SECRET above
@@ -59,14 +59,14 @@ Schedules (defined in `cron-worker/wrangler.toml`):
 - `*/15 * * * *` → calls `/api/sync-scores`
 - `*/10 * * * *` → calls `/api/score-picks`
 
-Verify: **Cloudflare dashboard → Workers & Pages → wcfantasy-cron → Triggers**
+Verify: **Cloudflare dashboard → Workers & Pages → soccer-fantasy-cron → Triggers**
 
 ---
 
 ## Step 4 — Bootstrap match data (run once)
 
 ```bash
-curl -X POST https://www.garageapothecary.com/worldcup2026/api/bootstrap-matches \
+curl -X POST https://www.garageapothecary.com/soccer-fantasy/api/bootstrap-matches \
   -H "Authorization: Bearer YOUR_CRON_SECRET"
 ```
 
@@ -106,7 +106,7 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_APP_URL: https://www.garageapothecary.com/worldcup2026
+          NEXT_PUBLIC_APP_URL: https://www.garageapothecary.com/soccer-fantasy
       - run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

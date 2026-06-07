@@ -13,7 +13,7 @@ export default function JoinLeagueForm({ userId }: { userId: string }) {
     setLoading(true)
     setError('')
 
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? '/worldcup2026'
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? '/soccer-fantasy'
     const res = await fetch(`${base}/api/join-league`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

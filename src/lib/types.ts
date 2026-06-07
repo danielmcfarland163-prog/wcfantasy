@@ -1,5 +1,5 @@
 // =============================================
-// WORLD CUP FANTASY 2026 — SHARED TYPES
+// SOCCER FANTASY GAME — SHARED TYPES
 // =============================================
 
 export type MatchStage = 'GROUP' | 'R32' | 'R16' | 'QF' | 'SF' | 'THIRD' | 'FINAL'

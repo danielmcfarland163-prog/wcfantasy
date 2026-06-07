@@ -1,7 +1,7 @@
 # Phase 0 — Ship Runbook (git → deploy → secrets)
 
 **Created:** 2026-06-06
-**Why:** The automation/realtime/live fix wave is written in the working tree but **uncommitted and unshipped**. The deployed app worker is built from a pre-fix commit; the deployed cron worker (`wcfantasy-cron`) dates to Jun 5 (pre-rewrite). This runbook ships it. Steps 1, 3, 5–8 **must run on your machine / Cloudflare** — they need your secret values, a healthy local git, and a production deploy, none of which can be done from the audit sandbox.
+**Why:** The automation/realtime/live fix wave is written in the working tree but **uncommitted and unshipped**. The deployed app worker is built from a pre-fix commit; the deployed cron worker (`soccer-fantasy-cron`) dates to Jun 5 (pre-rewrite). This runbook ships it. Steps 1, 3, 5–8 **must run on your machine / Cloudflare** — they need your secret values, a healthy local git, and a production deploy, none of which can be done from the audit sandbox.
 
 > Status of adjacent items at time of writing (verified):
 > - ✅ **Uruguay dedupe already done** — `teams` = 48, no duplicate, surviving row has group H + api_id 758. No action.
@@ -15,7 +15,7 @@
 The audit sandbox reported `error: improper chunk offset(s)` from git — that may be a sandbox artifact, but confirm your real repo is healthy before committing.
 
 ```powershell
-cd C:\Users\danie\Documents\Claude\Projects\Games\worldcup-fantasy
+cd C:\Users\danie\Documents\Claude\Projects\Games\soccer-fantasy-game
 git fsck --full
 git status
 ```
@@ -68,7 +68,7 @@ git commit -m "feat: live sync + realtime + cron automation; tests + CI gate"
 
 (`NEXT_PUBLIC_APP_URL` is hardcoded in the workflow to the basePath URL.)
 
-## 5. App worker runtime secrets — `wcfantasy` (one-time)
+## 5. App worker runtime secrets — `soccer-fantasy` (one-time)
 
 `NEXT_PUBLIC_*` are inlined at build, but the **server-only** vars must exist as Worker secrets or the API routes 500 at runtime. Values are in your `.env.local`.
 
@@ -81,13 +81,13 @@ npx wrangler secret put RESEND_FROM_EMAIL
 # (NEXT_PUBLIC_SUPABASE_URL / ANON_KEY are build-time; no secret needed)
 ```
 
-## 6. Cron worker — `wcfantasy-cron` (one-time secrets, then it deploys via CI)
+## 6. Cron worker — `soccer-fantasy-cron` (one-time secrets, then it deploys via CI)
 
-The cron worker calls the app's API routes on a schedule. It needs the app URL **including the `/worldcup2026` basePath** (omitting it makes every call 404 — the worker logs a warning if so) and the matching `CRON_SECRET`.
+The cron worker calls the app's API routes on a schedule. It needs the app URL **including the `/soccer-fantasy` basePath** (omitting it makes every call 404 — the worker logs a warning if so) and the matching `CRON_SECRET`.
 
 ```powershell
 cd cron-worker
-npx wrangler secret put APP_URL          # https://www.garageapothecary.com/worldcup2026
+npx wrangler secret put APP_URL          # https://www.garageapothecary.com/soccer-fantasy
 npx wrangler secret put CRON_SECRET      # MUST equal the app's CRON_SECRET (Step 5)
 cd ..
 ```
@@ -107,11 +107,11 @@ CI now (a) runs `npm test`, (b) builds, (c) deploys the **app worker**, then (d)
 
 ```powershell
 # Routes require the cron bearer; expect 200 + JSON, not 401/404.
-curl -X POST -H "Authorization: Bearer <CRON_SECRET>" https://www.garageapothecary.com/worldcup2026/api/sync-scores
-curl -X POST -H "Authorization: Bearer <CRON_SECRET>" https://www.garageapothecary.com/worldcup2026/api/score-picks
+curl -X POST -H "Authorization: Bearer <CRON_SECRET>" https://www.garageapothecary.com/soccer-fantasy/api/sync-scores
+curl -X POST -H "Authorization: Bearer <CRON_SECRET>" https://www.garageapothecary.com/soccer-fantasy/api/score-picks
 ```
 
-Then confirm: a live/finished match write updates the `matches` row; `/today` and `/live` reflect it without a manual refresh (realtime); and the Cloudflare dashboard shows scheduled invocations on `wcfantasy-cron`.
+Then confirm: a live/finished match write updates the `matches` row; `/today` and `/live` reflect it without a manual refresh (realtime); and the Cloudflare dashboard shows scheduled invocations on `soccer-fantasy-cron`.
 
 ## 9. Optional hardening (safe `is_league_member` fix)
 

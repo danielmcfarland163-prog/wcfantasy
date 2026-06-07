@@ -2,7 +2,7 @@ import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  basePath: '/worldcup2026',
+  basePath: '/soccer-fantasy',
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co' },

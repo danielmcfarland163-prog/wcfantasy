@@ -97,7 +97,7 @@ export default async function TodayPage() {
                   <LiveDot size={6} />
                   {live.length} LIVE NOW
                 </span>
-              ) : 'WORLD CUP 2026 · GROUPS'}
+              ) : 'GROUP STAGE'}
             </div>
             <h1 className="wc-title">Today</h1>
           </div>

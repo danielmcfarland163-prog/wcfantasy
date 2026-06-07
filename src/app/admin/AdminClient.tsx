@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase'
 import { formatKickoff } from '@/lib/utils'
 import type { Match } from '@/lib/types'
 
-// Prepend the basePath (e.g. /worldcup2026) so fetch calls work under Cloudflare's
+// Prepend the basePath (e.g. /soccer-fantasy) so fetch calls work under Cloudflare's
 // sub-path routing. Derived at runtime from the current URL to avoid hardcoding.
 function apiPath(path: string) {
   const base = window.location.pathname.replace(/\/admin(\/.*)?$/, '')

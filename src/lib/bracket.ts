@@ -1,5 +1,5 @@
 // =============================================
-// BRACKET DATA & LOGIC — 2026 World Cup
+// BRACKET DATA & LOGIC — Tournament
 // =============================================
 
 export interface BracketTeam {
@@ -85,7 +85,7 @@ export const FLOW = {
 
 // Tournament lock time — picks freeze when the first match kicks off.
 // Configurable via NEXT_PUBLIC_BRACKET_LOCK (ISO 8601, UTC); defaults to the
-// 2026 World Cup opener. NEXT_PUBLIC_ so both server and client read the same value.
+// tournament opener. NEXT_PUBLIC_ so both server and client read the same value.
 const LOCK_ISO = process.env.NEXT_PUBLIC_BRACKET_LOCK || '2026-06-11T15:00:00Z'
 export const TOURNAMENT_LOCK = new Date(LOCK_ISO)
 

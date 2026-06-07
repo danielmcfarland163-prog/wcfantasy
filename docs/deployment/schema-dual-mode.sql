@@ -1,6 +1,6 @@
 -- =============================================
 -- DUAL-MODE LEAGUE STANDINGS MIGRATION
--- World Cup Fantasy 2026
+-- Soccer Fantasy Game
 -- Run AFTER schema.sql and schema-bracket.sql
 -- =============================================
 

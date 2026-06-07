@@ -2,9 +2,9 @@
 
 _Last updated: 2026-06-05_
 
-World Cup Fantasy uses **Supabase Auth** through `@supabase/ssr`, so sessions
+Soccer Fantasy Game uses **Supabase Auth** through `@supabase/ssr`, so sessions
 work in Server Components, Route Handlers, and middleware. The app runs under
-the Next.js `basePath` `/worldcup2026`, which matters for every redirect URL.
+the Next.js `basePath` `/soccer-fantasy`, which matters for every redirect URL.
 
 ## Pieces
 
@@ -22,7 +22,7 @@ the Next.js `basePath` `/worldcup2026`, which matters for every redirect URL.
 
 1. **Guest** hits `/` (hero) and taps **Play for free → `/auth/login`**.
 2. **Magic link** (default): email → Supabase sends a link to
-   `<origin>/worldcup2026/auth/callback`. Password sign-up is also available.
+   `<origin>/soccer-fantasy/auth/callback`. Password sign-up is also available.
 3. **Callback** runs `exchangeCodeForSession(code)`. If the user's
    `user_metadata.onboarded !== true` → `/auth/onboarding`, else → `/today`.
    A failed/expired exchange → `/auth/login?error=link`.
@@ -60,8 +60,8 @@ Auth redirect URLs are **not** managed by code/migrations — set them once in
 **Authentication → URL Configuration**:
 
 - **Site URL**: the deployed origin (e.g. `https://<your-domain>`).
-- **Redirect URLs**: add `<origin>/worldcup2026/auth/callback`
-  (and `http://localhost:3000/worldcup2026/auth/callback` for local dev).
+- **Redirect URLs**: add `<origin>/soccer-fantasy/auth/callback`
+  (and `http://localhost:3000/soccer-fantasy/auth/callback` for local dev).
 - For password sign-up, leave **Confirm email** on (links route through the
   same callback). To skip email confirmation in dev, toggle it off.
 

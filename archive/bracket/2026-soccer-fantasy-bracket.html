@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>2026 World Cup Fantasy Bracket</title>
+<title>Soccer Fantasy Bracket</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -161,8 +161,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 <!-- LANDING -->
 <div id="screen-landing">
   <div class="trophy">⚽🏆</div>
-  <h1>2026 World Cup</h1>
-  <h2>Fantasy Bracket Challenge</h2>
+  <h1>Soccer Fantasy</h1>
+  <h2>Bracket Challenge</h2>
   <div class="start-card">
     <p>Pick your group winners, third-place qualifiers, and chart the path to the champion. June 11 – July 19, 2026.</p>
     <input class="name-input" id="pname" type="text" placeholder="Your name" maxlength="30" autocomplete="off">
@@ -229,8 +229,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   <!-- SUMMARY -->
   <div class="screen" id="screen-summary">
     <div class="sum-header">
-      <h2>🏆 <span id="sum-pname">Player</span>'s 2026 World Cup Bracket</h2>
-      <p>FIFA World Cup 2026 · USA / Canada / Mexico · June 11 – July 19</p>
+      <h2>🏆 <span id="sum-pname">Player</span>'s Tournament Bracket</h2>
+      <p>2026 Tournament · USA / Canada / Mexico · June 11 – July 19</p>
     </div>
     <button class="btn-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
     <div id="sum-content"></div>
@@ -598,7 +598,7 @@ function renderSummary(){
     cs.innerHTML='<div class="sum-section-hdr">🏆 My Champion</div>';
     const cd=el('div','champ-sum');
     const t=teamByName(S.picks.final);
-    cd.innerHTML=`<div class="cst">${t.f}</div><div class="csl">2026 World Cup Champion</div><div class="csn">${t.n}</div>`;
+    cd.innerHTML=`<div class="cst">${t.f}</div><div class="csl">Tournament Champion</div><div class="csn">${t.n}</div>`;
     cs.appendChild(cd);sc.appendChild(cs);
   }
 }

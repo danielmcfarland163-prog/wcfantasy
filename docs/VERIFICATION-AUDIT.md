@@ -1,4 +1,4 @@
-# World Cup Fantasy — Full Verification & Validation Audit
+# Soccer Fantasy Game — Full Verification & Validation Audit
 
 **Purpose:** Complete code, UI/UX, functionality, and gaps audit across all features  
 **Date:** 2026-06-05  
@@ -11,8 +11,8 @@
 Run this prompt against the codebase to identify all functionality gaps, UI/UX issues, and implementation blockers:
 
 ```
-You are auditing the World Cup Fantasy web app (Next.js + TypeScript + Supabase + Cloudflare).
-Reference the GDD at docs/GDD.md and design brief at docs/design/world-cup-app-design-prompt.md.
+You are auditing the Soccer Fantasy Game web app (Next.js + TypeScript + Supabase + Cloudflare).
+Reference the GDD at docs/GDD.md and design brief at docs/design/soccer-fantasy-app-design-prompt.md.
 
 Conduct a COMPLETE verification across these dimensions:
 
@@ -84,7 +84,7 @@ Conduct a COMPLETE verification across these dimensions:
 - [ ] Create league page: name, privacy (public/private), max members
 - [ ] Commissioner settings visible (if user is commissioner)
 - [ ] Invite code generation and copy-to-clipboard
-- [ ] Invite link shareable (e.g., `worldcup.example.com/join?code=ABC123`)
+- [ ] Invite link shareable (e.g., `soccer-fantasy.example.com/join?code=ABC123`)
 
 **League leaderboard:**
 - [ ] `/leagues/[id]` shows dual-tab leaderboard: "My Picks" | "Bracket"

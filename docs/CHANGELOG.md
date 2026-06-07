@@ -1,4 +1,4 @@
-# World Cup Fantasy — Changelog
+# Soccer Fantasy Game — Changelog
 
 ---
 
@@ -19,14 +19,14 @@ Implements the gap report's **Phase 2 ("make it live")** critical path.
   - `*/5 * * * *` → `sync-scores` then `score-picks` (pull live/finished scores, then score newly-finished picks)
   - `0 */6 * * *` → `sync-fixtures` then `score-bracket` (pick up knockout fixtures as they resolve, rescore brackets)
   - `0 18 * * *` → `notify-picks-reminder` (daily reminder email)
-  - Calls are uniform `POST`s; a startup check warns if `APP_URL` is missing the `/worldcup2026` basePath (the previous silent-404 footgun).
+  - Calls are uniform `POST`s; a startup check warns if `APP_URL` is missing the `/soccer-fantasy` basePath (the previous silent-404 footgun).
 - **`sync-scores` now captures LIVE matches.** `mapStatus` mapped in-play games to `SCHEDULED`, so the `/live` page was always empty; it now maps `IN_PLAY`/`PAUSED → LIVE` (and fetches the full competition, updating only in-play/finished/postponed rows).
 - **New `/api/sync-fixtures`** — idempotent full-schedule sync that generates **knockout match rows (R32 → Final)** as the draw/results resolve them. Unlike the one-shot `bootstrap-matches`, it does **not** create team rows (the cause of the duplicate-team bug); it maps football-data team ids onto existing teams via `api_id` and skips fixtures whose teams are still TBD. Wired to the 6-hour cron and exposed as an admin **"Sync fixtures"** button.
 - **Shared auth `lib/api-auth.ts` (`isCronOrAdmin`)** applied to `sync-scores`, `sync-fixtures`, `score-picks`, `score-bracket`, `seed-teams`, `notify-picks-reminder`. All now accept **both GET and POST**. This fixes the admin **"Sync live scores"** and **"Seed teams"** buttons, which previously returned 401 (they called CRON-secret-only routes with no header).
 - **Client realtime wiring.** New `RealtimeRefresh` component (debounced `router.refresh()` on Supabase `postgres_changes`) added to `/live`, `/today`, the global board (`/stats`), and league standings (`league_scores`, filtered by league). The relevant tables were already on the `supabase_realtime` publication; only the client subscriptions were missing.
 - **Fixes:** cron handler typed to `ScheduledController` (the previous `ScheduledEvent` never type-checked); `/today` "YOU" leaderboard highlight now works (`user_id` added to the select); removed dead `'FT'`/`'UPCOMING'` status branches on `/live` and `/today`; admin sync-scores result message updated to the new `{synced,live,finished}` shape.
 - **Verification:** app `tsc --noEmit` and `cron-worker` `tsc --noEmit` both clean.
-- **Deploy follow-ups (not code):** set runtime secrets on the app worker (`SUPABASE_SERVICE_ROLE_KEY`, `FOOTBALL_DATA_API_KEY`, `CRON_SECRET`, optional `RESEND_*`) and on the cron worker (`CRON_SECRET`, `APP_URL=https://www.garageapothecary.com/worldcup2026`); deploy `cron-worker/` via `wrangler deploy`. Still pending from Phase 1: dedupe the duplicate Uruguay rows (`URY`/`URU`).
+- **Deploy follow-ups (not code):** set runtime secrets on the app worker (`SUPABASE_SERVICE_ROLE_KEY`, `FOOTBALL_DATA_API_KEY`, `CRON_SECRET`, optional `RESEND_*`) and on the cron worker (`CRON_SECRET`, `APP_URL=https://www.garageapothecary.com/soccer-fantasy`); deploy `cron-worker/` via `wrangler deploy`. Still pending from Phase 1: dedupe the duplicate Uruguay rows (`URY`/`URU`).
 
 ### League Leaderboards — realtime, dual-mode standings, sort/filter (2026-06-06)
 
@@ -65,7 +65,7 @@ Implements the gap report's **Phase 2 ("make it live")** critical path.
 - Mobile logout via new `AccountMenu` in the Today header (desktop already had sign-out in `SideNav`).
 - DB migration `auth_onboarding_flow`: added `profiles.onboarded`, an INSERT RLS policy (`auth.uid() = id`), a collision-safe `handle_new_user()` trigger, and backfilled existing users.
 
-> ⚠️ Required Supabase config (Auth → URL Configuration): set **Site URL** to the deployed origin and add `<origin>/worldcup2026/auth/callback` to **Redirect URLs**. See `docs/architecture/AUTH.md`.
+> ⚠️ Required Supabase config (Auth → URL Configuration): set **Site URL** to the deployed origin and add `<origin>/soccer-fantasy/auth/callback` to **Redirect URLs**. See `docs/architecture/AUTH.md`.
 
 - Next.js + TypeScript + Tailwind app scaffold
 - Cloudflare Workers deployment configured
@@ -73,5 +73,5 @@ Implements the gap report's **Phase 2 ("make it live")** critical path.
 
 ## [Archived] v0.1 — HTML Bracket Prototype
 
-- Standalone `2026-world-cup-bracket.html` bracket viewer
+- Standalone `2026-soccer-fantasy-bracket.html` bracket viewer
 - Archived to `archive/bracket/`
