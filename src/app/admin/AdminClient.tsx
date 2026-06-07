@@ -90,7 +90,14 @@ function MatchesTab({ initialMatches }: { initialMatches: Match[] }) {
     setMsg('Syncing live scores...')
     const res = await fetch(apiPath('/api/sync-scores'))
     const d = await res.json()
-    setMsg(d.updated != null ? `Updated ${d.updated} matches.` : d.message ?? d.error ?? 'Done')
+    setMsg(d.synced != null ? `Synced ${d.synced} matches (${d.live ?? 0} live, ${d.finished ?? 0} finished).` : d.message ?? d.error ?? 'Done')
+  }
+
+  async function syncFixtures() {
+    setMsg('Syncing fixtures (incl. knockouts)...')
+    const res = await fetch(apiPath('/api/sync-fixtures'), { method: 'POST' })
+    const d = await res.json()
+    setMsg(d.upserted != null ? `Synced ${d.upserted} fixtures${d.skippedTBD ? ` (${d.skippedTBD} TBD skipped)` : ''}.` : d.message ?? d.error ?? 'Done')
   }
 
   async function seedTeams() {
@@ -106,6 +113,7 @@ function MatchesTab({ initialMatches }: { initialMatches: Match[] }) {
         <button onClick={triggerPickScoring} style={actionBtn}>✅ Score picks</button>
         <button onClick={triggerScoring} style={actionBtn}>⚡ Score brackets</button>
         <button onClick={syncScores} style={actionBtn}>🔄 Sync live scores</button>
+        <button onClick={syncFixtures} style={actionBtn}>📅 Sync fixtures</button>
         <button onClick={seedTeams} style={actionBtn}>🌍 Seed teams</button>
       </div>
       {msg && <div style={{ fontFamily: 'var(--f-mono)', fontSize: 11, color: 'var(--win)', background: 'color-mix(in srgb, var(--win) 8%, transparent)', borderRadius: 8, padding: '8px 12px', marginBottom: 14 }}>{msg}</div>}

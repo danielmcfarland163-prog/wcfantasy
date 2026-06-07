@@ -3,18 +3,18 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase-server'
+import { isCronOrAdmin } from '@/lib/api-auth'
 import { Resend } from 'resend'
 import { formatKickoff } from '@/lib/utils'
 import { addHours } from 'date-fns'
 
-export async function GET(req: NextRequest) {
+async function handler(req: NextRequest) {
+  if (!(await isCronOrAdmin(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const resend = new Resend(process.env.RESEND_API_KEY)
   const FROM = process.env.RESEND_FROM_EMAIL!
   const APP_URL = process.env.NEXT_PUBLIC_APP_URL!
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
 
   const supabase = createAdminSupabaseClient()
   const now = new Date()
@@ -84,3 +84,5 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ message: 'Reminders sent', sent, total: usersToNotify.length })
 }
+
+export { handler as GET, handler as POST }

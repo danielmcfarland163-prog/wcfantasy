@@ -4,6 +4,7 @@ import AppShell from '@/components/AppShell'
 import LiveHero from '@/components/LiveHero'
 import MatchRow from '@/components/MatchRow'
 import LiveDot from '@/components/ui/LiveDot'
+import RealtimeRefresh from '@/components/RealtimeRefresh'
 import type { MatchRowData } from '@/components/MatchRow'
 import { format } from 'date-fns'
 
@@ -34,7 +35,7 @@ export default async function LivePage() {
   const { data: recentMatches } = await supabase
     .from('matches')
     .select('*, home_team:teams!matches_home_team_id_fkey(*), away_team:teams!matches_away_team_id_fkey(*)')
-    .in('status', ['FT', 'FINISHED'])
+    .in('status', ['FINISHED'])
     .order('kickoff_time', { ascending: false })
     .limit(8)
 
@@ -43,6 +44,7 @@ export default async function LivePage() {
 
   return (
     <AppShell>
+      <RealtimeRefresh tables={['matches']} />
       <div style={{ paddingBottom: 28 }}>
         {/* Header */}
         <div style={{ padding: '8px 20px 8px' }}>

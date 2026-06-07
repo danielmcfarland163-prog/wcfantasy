@@ -1,24 +1,14 @@
-// GET /api/score-picks
-// Scores all un-scored picks for finished matches.
-// Protected by CRON_SECRET (cron) or admin session (manual).
-// Cron: runs every 10 minutes during group stage.
+// GET|POST /api/score-picks
+// Scores all un-scored picks for finished matches and re-aggregates standings.
+// Auth: CRON_SECRET (cron) OR an admin session (manual).
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase-server'
-import { isAdminUser } from '@/lib/admin'
+import { createAdminSupabaseClient } from '@/lib/supabase-server'
+import { isCronOrAdmin } from '@/lib/api-auth'
 import { scorePicks } from '@/lib/score-utils'
 
-async function isAuthorized(req: NextRequest): Promise<boolean> {
-  if (req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`) return true
-  try {
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    return !!user && isAdminUser(user.id)
-  } catch { return false }
-}
-
-export async function GET(req: NextRequest) {
-  if (!await isAuthorized(req)) {
+async function handler(req: NextRequest) {
+  if (!(await isCronOrAdmin(req))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -40,3 +30,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+
+export { handler as GET, handler as POST }

@@ -1,13 +1,16 @@
 /**
  * wcfantasy-cron
  *
- * A standalone Cloudflare Worker that fires on two schedules and calls
- * the Next.js API routes deployed on Cloudflare Pages.
+ * Standalone Cloudflare Worker that fires on several schedules and calls the
+ * Next.js API routes deployed with the app. Each schedule runs an ordered list
+ * of steps sequentially (e.g. sync scores, THEN score the now-finished picks).
  *
  * Required secrets (set via `wrangler secret put`):
- *   APP_URL      — base URL of your Pages deployment, no trailing slash
- *                  e.g. https://wcfantasy.pages.dev
- *   CRON_SECRET  — must match CRON_SECRET in the Pages env vars
+ *   APP_URL      — base URL of the deployment INCLUDING the basePath, no trailing slash.
+ *                  For this app that is:  https://www.garageapothecary.com/worldcup2026
+ *                  (The Next app uses basePath '/worldcup2026', so API routes live at
+ *                   <APP_URL>/api/...  — omitting the basePath makes every call 404.)
+ *   CRON_SECRET  — must match CRON_SECRET in the app's runtime env.
  */
 
 export interface Env {
@@ -15,23 +18,29 @@ export interface Env {
   CRON_SECRET: string
 }
 
-type CronRoute = {
-  path: string
-  label: string
+type Step = { path: string; label: string }
+
+// Each cron expression (must match wrangler.toml [triggers].crons) maps to an
+// ordered list of route calls executed one after another.
+const SCHEDULES: Record<string, Step[]> = {
+  // Every 5 min: pull live/finished scores, then score any newly-finished picks.
+  '*/5 * * * *': [
+    { path: '/api/sync-scores', label: 'sync-scores' },
+    { path: '/api/score-picks', label: 'score-picks' },
+  ],
+  // Every 6 hours: pick up knockout fixtures as they resolve, then rescore brackets.
+  '0 */6 * * *': [
+    { path: '/api/sync-fixtures', label: 'sync-fixtures' },
+    { path: '/api/score-bracket', label: 'score-bracket' },
+  ],
+  // Daily 18:00 UTC: email reminders for matches locking in the next 24h.
+  '0 18 * * *': [
+    { path: '/api/notify-picks-reminder', label: 'notify-picks-reminder' },
+  ],
 }
 
-/**
- * Map each cron expression to the route it should call.
- * Add more entries here if you add more schedules in wrangler.toml.
- */
-const CRON_MAP: Record<string, CronRoute> = {
-  // Score bracket picks every 15 minutes during the tournament
-  '*/15 * * * *': { path: '/api/score-bracket', label: 'score-bracket' },
-}
-
-async function callRoute(env: Env, route: CronRoute): Promise<void> {
-  const url = `${env.APP_URL}${route.path}`
-
+async function callRoute(env: Env, step: Step): Promise<void> {
+  const url = `${env.APP_URL}${step.path}`
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -39,26 +48,35 @@ async function callRoute(env: Env, route: CronRoute): Promise<void> {
       'Content-Type': 'application/json',
     },
   })
-
   const body = await res.text()
-
   if (!res.ok) {
-    console.error(`[${route.label}] HTTP ${res.status}: ${body}`)
-    throw new Error(`${route.label} returned ${res.status}`)
+    console.error(`[${step.label}] HTTP ${res.status}: ${body}`)
+    throw new Error(`${step.label} returned ${res.status}`)
   }
+  console.log(`[${step.label}] OK — ${body}`)
+}
 
-  console.log(`[${route.label}] OK — ${body}`)
+// Run steps in order; a failing step is logged but does not abort the rest.
+async function runSteps(env: Env, steps: Step[]): Promise<void> {
+  if (!env.APP_URL?.includes('/worldcup2026')) {
+    console.warn(`[cron] APP_URL "${env.APP_URL}" is missing the /worldcup2026 basePath — calls will 404.`)
+  }
+  for (const step of steps) {
+    try {
+      await callRoute(env, step)
+    } catch (err) {
+      console.error(`[cron] step ${step.label} failed:`, err)
+    }
+  }
 }
 
 export default {
-  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
-    const route = CRON_MAP[event.cron]
-
-    if (!route) {
-      console.warn(`[cron] No handler for schedule: ${event.cron}`)
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const steps = SCHEDULES[controller.cron]
+    if (!steps) {
+      console.warn(`[cron] No handler for schedule: ${controller.cron}`)
       return
     }
-
-    ctx.waitUntil(callRoute(env, route))
+    ctx.waitUntil(runSteps(env, steps))
   },
 } satisfies ExportedHandler<Env>

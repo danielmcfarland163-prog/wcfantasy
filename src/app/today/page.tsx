@@ -6,6 +6,7 @@ import AccountMenu from '@/components/AccountMenu'
 import MatchRow from '@/components/MatchRow'
 import LiveHero from '@/components/LiveHero'
 import LiveDot from '@/components/ui/LiveDot'
+import RealtimeRefresh from '@/components/RealtimeRefresh'
 import Flag, { isoForTeam } from '@/components/ui/Flag'
 import type { MatchRowData } from '@/components/MatchRow'
 import { format } from 'date-fns'
@@ -64,7 +65,7 @@ export default async function TodayPage() {
   // Top 3 leaderboard
   const { data: topScores } = await supabase
     .from('global_scores')
-    .select('total_points, global_rank, profile:profiles(username)')
+    .select('user_id, total_points, global_rank, profile:profiles(username)')
     .order('total_points', { ascending: false })
     .limit(3)
 
@@ -77,14 +78,15 @@ export default async function TodayPage() {
 
   const live = (liveMatches ?? []).map(matchToRow)
   const today = (todayMatches ?? []).map(matchToRow)
-  const upcoming = today.filter(m => m.status === 'SCHEDULED' || m.status === 'UPCOMING')
-  const finished = today.filter(m => m.status === 'FT' || m.status === 'FINISHED')
+  const upcoming = today.filter(m => m.status === 'SCHEDULED')
+  const finished = today.filter(m => m.status === 'FINISHED')
 
   const hasLive = live.length > 0
   const hasToday = today.length > 0
 
   return (
     <AppShell>
+      <RealtimeRefresh tables={['matches', 'global_scores']} />
       <div style={{ paddingBottom: 28 }}>
         {/* Header */}
         <div style={{ padding: '8px 20px 4px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>

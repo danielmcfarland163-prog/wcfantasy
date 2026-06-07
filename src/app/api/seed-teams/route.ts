@@ -1,8 +1,9 @@
 // POST /api/seed-teams — seeds all 48 teams + creates tournament_results row
-// Protected by CRON_SECRET. Run once after deploying schema-bracket.sql.
+// Auth: CRON_SECRET OR an admin session (the /admin "Seed teams" button).
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase-server'
+import { isCronOrAdmin } from '@/lib/api-auth'
 
 const TEAMS = [
   { name: 'Mexico',         short_code: 'MEX', group_letter: 'A', flag_emoji: '🇲🇽' },
@@ -36,7 +37,7 @@ const TEAMS = [
   { name: 'Spain',          short_code: 'ESP', group_letter: 'H', flag_emoji: '🇪🇸' },
   { name: 'Cape Verde',     short_code: 'CPV', group_letter: 'H', flag_emoji: '🇨🇻' },
   { name: 'Saudi Arabia',   short_code: 'KSA', group_letter: 'H', flag_emoji: '🇸🇦' },
-  { name: 'Uruguay',        short_code: 'URU', group_letter: 'H', flag_emoji: '🇺🇾' },
+  { name: 'Uruguay',        short_code: 'URY', group_letter: 'H', flag_emoji: '🇺🇾' },
   { name: 'France',         short_code: 'FRA', group_letter: 'I', flag_emoji: '🇫🇷' },
   { name: 'Senegal',        short_code: 'SEN', group_letter: 'I', flag_emoji: '🇸🇳' },
   { name: 'Iraq',           short_code: 'IRQ', group_letter: 'I', flag_emoji: '🇮🇶' },
@@ -56,8 +57,7 @@ const TEAMS = [
 ]
 
 export async function POST(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!(await isCronOrAdmin(req))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

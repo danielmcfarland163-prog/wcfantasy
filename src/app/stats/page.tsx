@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import AppShell from '@/components/AppShell'
 import StatsClient from './StatsClient'
+import RealtimeRefresh from '@/components/RealtimeRefresh'
 
 export default async function StatsPage() {
   const supabase = await createServerSupabaseClient()
@@ -15,6 +16,7 @@ export default async function StatsPage() {
 
   return (
     <AppShell>
+      <RealtimeRefresh tables={['global_scores']} />
       <StatsClient scores={(scores ?? []) as any} userId={user.id} />
     </AppShell>
   )

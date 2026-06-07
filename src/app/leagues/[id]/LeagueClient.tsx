@@ -5,6 +5,7 @@ import Link from 'next/link'
 import LeagueChat from '@/components/LeagueChat'
 import CopyInviteButton from '@/components/CopyInviteButton'
 import BracketReviewer from '@/components/BracketReviewer'
+import RealtimeRefresh from '@/components/RealtimeRefresh'
 
 type GameMode = 'picks' | 'bracket' | 'both' | 'combined'
 type StandingsTab = 'picks' | 'bracket' | 'combined'
@@ -95,6 +96,7 @@ export default function LeagueClient({ league, scores, bracketEntries, currentUs
 
   return (
     <div style={{ paddingBottom: 40, background: 'var(--bg)', minHeight: '100svh' }}>
+      <RealtimeRefresh tables={['league_scores']} filter={`league_id=eq.${league.id}`} />
 
       {/* ── HERO ─────────────────────────────────────── */}
       <div style={{

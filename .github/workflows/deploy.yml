@@ -17,6 +17,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Test
+        run: npm test
+
       - name: Build
         run: npm run pages:build
         env:
@@ -24,10 +27,23 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_APP_URL: https://www.garageapothecary.com/worldcup2026
 
-      - name: Deploy
+      - name: Deploy app worker
         run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           # Required so wrangler can pick the account non-interactively when the
           # API token has access to more than one account.
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Deploy the standalone cron worker that drives sync-scores / score-picks /
+      # sync-fixtures / score-bracket / notify on a schedule. It has its own
+      # directory + wrangler.toml. Runtime secrets (APP_URL, CRON_SECRET) are set
+      # once via `wrangler secret put` and persist across deploys.
+      - name: Deploy cron worker
+        working-directory: cron-worker
+        run: |
+          npm ci
+          npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

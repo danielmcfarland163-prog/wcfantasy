@@ -1,7 +1,7 @@
-// POST /api/score-bracket
+// GET|POST /api/score-bracket
 // Recomputes all bracket scores from current tournament_results.
-// Protected by CRON_SECRET or admin session.
 // Works incrementally -- safe to call after any round completes.
+// Auth: CRON_SECRET (cron) OR an admin session (manual).
 //
 // Scoring (GDD section 2.2 -- values live in lib/bracket-scoring.ts):
 //   Group 1st correct:            2 pts x 12 = 24 max
@@ -15,21 +15,12 @@
 //                                       Total = 231 max
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase-server'
-import { isAdminUser } from '@/lib/admin'
+import { createAdminSupabaseClient } from '@/lib/supabase-server'
+import { isCronOrAdmin } from '@/lib/api-auth'
 import { scoreBrackets } from '@/lib/score-utils'
 
-async function isAuthorized(req: NextRequest): Promise<boolean> {
-  if (req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`) return true
-  try {
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    return !!user && isAdminUser(user.id)
-  } catch { return false }
-}
-
-export async function POST(req: NextRequest) {
-  if (!await isAuthorized(req)) {
+async function handler(req: NextRequest) {
+  if (!(await isCronOrAdmin(req))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -42,3 +33,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+
+export { handler as GET, handler as POST }
