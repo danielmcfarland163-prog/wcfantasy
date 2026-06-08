@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
@@ -98,6 +99,30 @@ export default function AccountMenu({ username }: { username?: string }) {
                 @{username ?? 'player'}
               </div>
             </div>
+            <Link
+              href="/how-to-play"
+              onClick={() => setOpen(false)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 9,
+                padding: '12px 14px',
+                borderBottom: '1px solid var(--line)',
+                background: 'transparent',
+                textDecoration: 'none',
+                fontFamily: 'var(--f-body)',
+                fontSize: 14,
+                fontWeight: 600,
+                color: 'var(--ink-2)',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M9.5 9a2.5 2.5 0 0 1 4.5 1.5c0 1.5-2 2-2 3M12 17h.01" />
+              </svg>
+              How to Play
+            </Link>
             <button
               type="button"
               onClick={signOut}

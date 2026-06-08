@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+### How to Play page + admin chat reset (2026-06-08)
+
+- **How to Play & Scoring page.** New `/how-to-play` route (`src/app/how-to-play/page.tsx`) — a light, self-contained rules page covering both games: Match Picks (flat 0 / 3 / 5) with a worked 2–1 example, the Bracket's two modes (Up-Front Pick'em vs. Bracket Reset) and the full per-round ladder (group 1st/2nd + 3rd qualifier 2 · R32 3 · R16 5 · QF 8 · SF 13 · champion 21; perfect = 231/mode), how league standings combine Picks + Bracket = Total, and when each pick locks. Values sourced from `GDD.md` / `lib/scoring.ts` / `lib/bracket-scoring.ts`. Copy is deliberately generic ("the tournament", "group stage", "knockout rounds") — no specific real-world tournament or governing body is named.
+- **Discoverable from three entry points.** A help (?) icon button in the Today header, a "How to Play" item in the `AccountMenu` dropdown, and a footer link in the desktop `SideNav` (above Admin) — covering mobile and desktop without disturbing the primary nav. The page sits behind the normal auth/onboarding middleware like its siblings.
+- **Admin — reset a league's chat.** New `POST /api/admin/reset-chat` (`{ leagueId }`, or `{ all: true }`) guarded by `isAdminUser`; uses the service-role client to bypass the per-user "delete own messages" RLS policy and clears `chat_messages` for the league, returning the deleted count. Wired into Admin → Leagues as a "Reset chat" button beside each league's Delete, with a confirm dialog and a "Cleared N messages" result line. No schema change.
+- **Verification.** New files transpile clean in isolation; all four edited files confirmed well-formed. A full-project `tsc`/`vitest` run was not reliable in this session because the dev sandbox mount served stale/NUL-padded mirrors of several pre-existing files (`lib/types.ts`, `lib/scoring.ts`, `bracket/page.tsx`, …) — a mount artifact, not on-disk corruption. Re-confirm with `npm run test` / `npm run build` on the host.
+
 ### Fix: cron deploy failing on Cloudflare's 5-trigger account cap (2026-06-08)
 
 - **Symptom.** CI deploy of `soccer-fantasy-cron` failed at the schedule-registration step with `code: 10072` — *"You have exceeded the limit of 5 cron triggers."* The Worker uploaded fine; only the cron registration was rejected. Cloudflare counts cron triggers **per account** (cap 5 on the Free plan), across every Worker — and the leftover pre-rebrand `wcfantasy-cron` (3 triggers) plus this Worker's 3 pushed the account over 5.

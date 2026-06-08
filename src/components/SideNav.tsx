@@ -160,6 +160,32 @@ export default function SideNav({ isAdmin = false }: { isAdmin?: boolean }) {
 
       {/* Footer */}
       <div style={{ padding: '12px 10px 20px', borderTop: '1px solid var(--line)' }}>
+        <Link
+          href="/how-to-play"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 12px',
+            borderRadius: 10,
+            textDecoration: 'none',
+            marginBottom: 4,
+            background: pathname.startsWith('/how-to-play')
+              ? 'color-mix(in srgb, var(--accent) 12%, transparent)'
+              : 'transparent',
+            color: pathname.startsWith('/how-to-play') ? 'var(--accent)' : 'var(--ink-3)',
+            fontFamily: 'var(--f-body)',
+            fontSize: 13,
+            fontWeight: pathname.startsWith('/how-to-play') ? 700 : 500,
+            transition: 'background .12s',
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M9.5 9a2.5 2.5 0 0 1 4.5 1.5c0 1.5-2 2-2 3M12 17h.01" />
+          </svg>
+          How to Play
+        </Link>
         {isAdmin && (
           <Link
             href="/admin"

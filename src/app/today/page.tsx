@@ -103,6 +103,17 @@ export default async function TodayPage() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <Link
+              href="/how-to-play"
+              className="wc-icon-btn"
+              style={{ textDecoration: 'none' }}
+              title="How to Play"
+            >
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M9.5 9a2.5 2.5 0 0 1 4.5 1.5c0 1.5-2 2-2 3M12 17h.01" />
+              </svg>
+            </Link>
+            <Link
               href="/leagues"
               className="wc-icon-btn"
               style={{ textDecoration: 'none' }}

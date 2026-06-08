@@ -288,6 +288,13 @@ function LeaguesTab() {
     else setMsg(d.error ?? 'Error')
   }
 
+  async function resetChat(id: string, name: string) {
+    if (!confirm(`Clear all chat messages in "${name}"? This can't be undone.`)) return
+    const res = await fetch(apiPath('/api/admin/reset-chat'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ leagueId: id }) })
+    const d = await res.json()
+    setMsg(d.ok ? `Cleared ${d.deleted} message${d.deleted === 1 ? '' : 's'} from "${name}".` : d.error ?? 'Error')
+  }
+
   async function createLeague(e: React.FormEvent) {
     e.preventDefault()
     setCreating(true)
@@ -342,9 +349,14 @@ function LeaguesTab() {
                 {lg.member_count?.[0]?.count ?? 0} members · CODE: {lg.invite_code}
               </div>
             </div>
-            <button onClick={() => deleteLeague(lg.id, lg.name)} style={{ ...smallBtn, color: 'var(--live)', borderColor: 'color-mix(in srgb, var(--live) 30%, var(--line))' }}>
-              Delete
-            </button>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <button onClick={() => resetChat(lg.id, lg.name)} style={smallBtn}>
+                Reset chat
+              </button>
+              <button onClick={() => deleteLeague(lg.id, lg.name)} style={{ ...smallBtn, color: 'var(--live)', borderColor: 'color-mix(in srgb, var(--live) 30%, var(--line))' }}>
+                Delete
+              </button>
+            </div>
           </div>
         ))}
       </div>
