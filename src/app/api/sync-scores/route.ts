@@ -18,6 +18,7 @@ interface FDMatch {
   id: number
   status: FDStatus
   score: {
+    winner: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null
     fullTime: { home: number | null; away: number | null }
     halfTime: { home: number | null; away: number | null }
   }
@@ -72,11 +73,29 @@ async function handler(req: NextRequest) {
       return NextResponse.json({ message: 'No live or finished matches', synced: 0 })
     }
 
+    // Resolve our team UUIDs + stage per actionable fixture so we can record the
+    // knockout WINNER (score.winner — covers extra time / penalties, which the
+    // fullTime score alone doesn't). derive-results reads winner_team_id to build
+    // the bracket; group matches leave it null (standings come from the score).
+    const { data: metaRows } = await supabase
+      .from('matches')
+      .select('api_match_id, home_team_id, away_team_id, stage')
+      .in('api_match_id', actionable.map((m) => m.id))
+    const metaById = new Map<number, { home_team_id: string; away_team_id: string; stage: string }>(
+      (metaRows ?? []).map((r: any) => [r.api_match_id as number, r]),
+    )
+
     let synced = 0
     let live = 0
     let finished = 0
     for (const fdMatch of actionable) {
       const status = mapStatus(fdMatch.status)
+      const meta = metaById.get(fdMatch.id)
+      let winner_team_id: string | null = null
+      if (meta && meta.stage !== 'GROUP' && status === 'FINISHED') {
+        if (fdMatch.score.winner === 'HOME_TEAM') winner_team_id = meta.home_team_id
+        else if (fdMatch.score.winner === 'AWAY_TEAM') winner_team_id = meta.away_team_id
+      }
       const { error } = await supabase
         .from('matches')
         .update({
@@ -84,6 +103,7 @@ async function handler(req: NextRequest) {
           away_score: fdMatch.score.fullTime.away,
           home_score_ht: fdMatch.score.halfTime.home,
           away_score_ht: fdMatch.score.halfTime.away,
+          winner_team_id,
           status,
           updated_at: new Date().toISOString(),
         })

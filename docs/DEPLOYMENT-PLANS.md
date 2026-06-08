@@ -12,9 +12,9 @@
 CRITICAL (Must-have for launch)          HIGH (Should-have)                LOW (Nice-to-have)
 ├─ Auth & Onboarding                     ├─ Admin Panel                     ├─ Stats & Analytics
 ├─ Match Picks Core (My Picks)           ├─ League Chat                     ├─ Notifications/Email
-├─ Bracket Picker & Submission           ├─ Tournament Bonus Picks          ├─ Mobile Animations
-├─ League Leaderboards (dual-mode)       ├─ Live Score Sync                 └─ Dark Mode
-├─ Global Leaderboard                    └─ Push Notifications
+├─ Bracket Picker & Submission           ├─ Live Score Sync                 ├─ Mobile Animations
+├─ League Leaderboards (dual-mode)       └─ Push Notifications              └─ Dark Mode
+├─ Global Leaderboard
 ├─ Scoring Engine (both modes)
 └─ Deployment to Cloudflare
 ```
@@ -605,35 +605,9 @@ Build automated score syncing from football-data.org API.
 
 ---
 
-## 10. Tournament Bonus Picks
+## 10. Tournament Bonus Picks — Descoped (2026-06-08)
 
-**File:** `src/app/picks/`, database schema  
-**Scope:** Champion, runner-up, golden boot predictions  
-**Effort:** 1 day  
-
-```
-DEPLOYMENT PROMPT: Tournament Bonus Picks
-
-Add bonus prediction picks for champion, runner-up, and golden boot winner.
-
-**Scope:**
-1. After group stage ends, show bonus picks section
-2. Pick: Champion (10 pts), Runner-up (5 pts), Golden Boot (5 pts)
-3. Lock at group stage end date
-4. Score when tournament ends
-5. Add points to user's picks_points
-
-**Implementation:**
-- Table: tournament_bonus_picks (user_id, tournament_year, champion_team_id, runner_up_team_id, golden_boot_player_id)
-- Lock logic: unlock after group stage, lock at group stage end
-- Scoring: compare vs. actual tournament results
-- Display on /picks page in collapsible "Bonus Picks" section
-
-**Deliverable:**
-- Bonus picks functional
-- Lock timing correct
-- Scoring integrated
-```
+**Removed from scope.** Champion / runner-up / golden-boot predictions are no longer a planned feature. The orphaned scaffolding — the `tournament_picks` table, the `TournamentPick` type, and the 10/5/5 `scoring_config` rows — has been removed from the codebase and `schema.sql`; existing databases can be cleaned with `migrations/2026-06-08_drop_tournament_picks_descope.sql`. See the CHANGELOG for details.
 
 ---
 

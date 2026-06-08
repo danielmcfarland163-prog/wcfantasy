@@ -8,9 +8,6 @@ import type { Pick, Match, ScoringConfig } from './types'
 const DEFAULT_CONFIG: ScoringConfig = {
   correct_result_pts: 3,
   exact_score_bonus: 2,    // on top of correct_result_pts = 5 total
-  champion_pts: 10,
-  runner_up_pts: 5,
-  golden_boot_pts: 5,
 }
 
 export type MatchResult = 'HOME' | 'DRAW' | 'AWAY'

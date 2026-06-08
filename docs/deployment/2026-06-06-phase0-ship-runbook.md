@@ -129,4 +129,4 @@ Also enable **Leaked Password Protection** in the Supabase dashboard (Auth → P
 ---
 
 ### Out of scope for Phase 0 (tracked in the gap report)
-Tournament bonus picks (unbuilt), `/join/[code]` route + a real `/leaderboard`, league privacy/max-members controls, stats depth, knockout fixtures (run `sync-fixtures` after the real draw).
+Tournament bonus picks (descoped 2026-06-08 — removed from scope), `/join/[code]` route + a real `/leaderboard`, league privacy/max-members controls, stats depth, knockout fixtures (run `sync-fixtures` after the real draw).

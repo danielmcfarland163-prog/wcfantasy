@@ -28,9 +28,12 @@ const SCHEDULES: Record<string, Step[]> = {
     { path: '/api/sync-scores', label: 'sync-scores' },
     { path: '/api/score-picks', label: 'score-picks' },
   ],
-  // Every 6 hours: pick up knockout fixtures as they resolve, then rescore brackets.
+  // Every 6 hours: pick up knockout fixtures as they resolve, derive the real
+  // tournament_results (group standings + knockout winners) from the match rows,
+  // then rescore brackets against those results.
   '0 */6 * * *': [
     { path: '/api/sync-fixtures', label: 'sync-fixtures' },
+    { path: '/api/derive-results', label: 'derive-results' },
     { path: '/api/score-bracket', label: 'score-bracket' },
   ],
   // Daily 18:00 UTC: email reminders for matches locking in the next 24h.

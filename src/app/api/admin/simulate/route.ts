@@ -76,15 +76,24 @@ export async function POST(req: NextRequest) {
   // ── RESET ──────────────────────────────────────────────────────────────────
   if (action === 'reset') {
     await db.from('matches')
-      .update({ status: 'SCHEDULED', home_score: null, away_score: null })
+      .update({ status: 'SCHEDULED', home_score: null, away_score: null, winner_team_id: null })
       .eq('stage', 'GROUP')
+
+    // Knockout rows are created dynamically (sync-fixtures / test seed), so a reset
+    // must DELETE them (and their picks) to return to a clean pre-tournament state.
+    const { data: koMatches } = await db.from('matches').select('id').neq('stage', 'GROUP')
+    const koIds = (koMatches ?? []).map((m: any) => m.id as string)
+    if (koIds.length) {
+      await db.from('picks').delete().in('match_id', koIds)
+      await db.from('matches').delete().neq('stage', 'GROUP')
+    }
 
     await db.from('picks')
       .update({ scored_at: null, points_earned: null, pick_result: null })
       .not('scored_at', 'is', null)
 
     await db.from('global_scores')
-      .update({ total_points: 0, picks_points: 0, bracket_points: 0, picks_correct: 0, bracket_correct: 0, correct_results: 0, picks_made: 0, global_rank: null, updated_at: new Date().toISOString() })
+      .update({ total_points: 0, picks_points: 0, bracket_points: 0, picks_correct: 0, bracket_correct: 0, correct_results: 0, exact_scores: 0, picks_made: 0, global_rank: null, updated_at: new Date().toISOString() })
       .neq('user_id', '00000000-0000-0000-0000-000000000000')
 
     // Clear league standings too. Without this, league tables keep their stale

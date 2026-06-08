@@ -101,7 +101,7 @@ function ResultBadge({ pick, actual }: { pick: string | null | undefined; actual
   )
 }
 
-function BracketDetail({ entry, results }: { entry: BracketEntry; results?: TournamentResults | null }) {
+export function BracketDetail({ entry, results }: { entry: BracketEntry; results?: TournamentResults | null }) {
   const state = dbToState(entry as any)
   const name = entry.profile?.display_name ?? entry.profile?.username ?? 'Unknown'
   const bracketPicks = [...state.r32, ...state.r16, ...state.qf, ...state.sf, state.final].filter(Boolean).length

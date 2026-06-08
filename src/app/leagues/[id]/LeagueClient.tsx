@@ -1,14 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, type CSSProperties } from 'react'
 import Link from 'next/link'
 import LeagueChat from '@/components/LeagueChat'
 import CopyInviteButton from '@/components/CopyInviteButton'
-import BracketReviewer from '@/components/BracketReviewer'
 import RealtimeRefresh from '@/components/RealtimeRefresh'
 
 type GameMode = 'picks' | 'bracket' | 'both' | 'combined'
-type StandingsTab = 'picks' | 'bracket' | 'combined'
 
 const MODE_META: Record<GameMode, { icon: string; label: string }> = {
   picks:    { icon: '⚽', label: 'Match Picks' },
@@ -36,125 +34,95 @@ function Avatar({ name, size = 36 }: { name: string; size?: number }) {
   )
 }
 
+const headCell: CSSProperties = { flexShrink: 0, textAlign: 'center', fontFamily: 'var(--f-mono)', fontSize: 9, fontWeight: 700, color: 'var(--ink-3)', letterSpacing: '0.3px' }
+const numCell:  CSSProperties = { flexShrink: 0, textAlign: 'center', fontFamily: 'var(--f-mono)', fontSize: 13, color: 'var(--ink-2)' }
+
 interface Score {
   user_id: string
   total_points: number
   picks_points?: number
   bracket_points?: number
-  picks_rank?: number
-  bracket_rank?: number
-  picks_rank_change?: number
-  bracket_rank_change?: number
   rank_change?: number
-  picks_made?: number
   profile?: { username: string; display_name?: string }
-}
-
-interface TournamentResults {
-  group_results: Record<string, { first: string; second: string; third: string }>
-  third_quals: string[]
-  r32_results: (string | null)[]
-  r16_results: (string | null)[]
-  qf_results:  (string | null)[]
-  sf_results:  (string | null)[]
-  final_result: string | null
 }
 
 interface LeagueClientProps {
   league: { id: string; name: string; description?: string; invite_code: string; game_mode?: GameMode; commissioner_id: string }
   scores: Score[]
-  bracketEntries: any[]
   currentUserId: string
   currentProfile: { username: string; display_name?: string } | null
   inviteUrl: string
-  tournamentResults?: TournamentResults | null
 }
 
-export default function LeagueClient({ league, scores, bracketEntries, currentUserId, currentProfile, inviteUrl, tournamentResults }: LeagueClientProps) {
+export default function LeagueClient({ league, scores, currentUserId, currentProfile, inviteUrl }: LeagueClientProps) {
   const mode: GameMode = league.game_mode ?? 'both'
   const modeMeta = MODE_META[mode]
 
-  const defaultTab: StandingsTab = mode === 'bracket' ? 'bracket' : mode === 'combined' ? 'combined' : 'picks'
-  const [activeTab, setActiveTab] = useState<StandingsTab>(defaultTab)
+  // Open at the top: AppShell scrolls an inner container (.wc-noscroll), not the
+  // window, so default scroll restoration can leave the page mid-scroll.
+  useEffect(() => {
+    const reset = () => {
+      const el = document.querySelector('.wc-noscroll') as HTMLElement | null
+      if (el) el.scrollTop = 0
+      else window.scrollTo(0, 0)
+    }
+    reset()
+    requestAnimationFrame(reset)
+  }, [])
 
-  function getPoints(s: Score): number {
-    if (activeTab === 'bracket') return s.bracket_points ?? 0
-    if (activeTab === 'combined') return (s.picks_points ?? 0) + (s.bracket_points ?? 0)
-    return s.picks_points ?? s.total_points ?? 0
-  }
+  const picksOf   = (s: Score) => s.picks_points ?? 0
+  const bracketOf = (s: Score) => s.bracket_points ?? 0
+  const totalOf   = (s: Score) => picksOf(s) + bracketOf(s)
 
-  function getRankChange(s: Score): number {
-    if (activeTab === 'bracket') return s.bracket_rank_change ?? 0
-    return s.picks_rank_change ?? s.rank_change ?? 0
-  }
-
-  const sorted = [...scores].sort((a, b) => getPoints(b) - getPoints(a))
-  const top3 = sorted.slice(0, 3)
-  const rest = sorted.slice(3)
-
-  const showTabs = mode === 'both'
+  const sorted = [...scores].sort((a, b) => totalOf(b) - totalOf(a) || picksOf(b) - picksOf(a))
+  const medals = ['🥇', '🥈', '🥉']
 
   return (
     <div style={{ paddingBottom: 40, background: 'var(--bg)', minHeight: '100svh' }}>
       <RealtimeRefresh tables={['league_scores']} filter={`league_id=eq.${league.id}`} />
 
-      {/* ── HERO ─────────────────────────────────────── */}
+      {/* ── HERO (compact) ───────────────────────────── */}
       <div style={{
         background: 'linear-gradient(145deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 55%, #0a0d1a) 100%)',
-        padding: '16px 20px 28px',
+        padding: '12px 20px 16px',
         position: 'relative',
         overflow: 'hidden',
       }}>
-        {/* Decorative circles */}
-        <div style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -60, left: -20, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: -40, right: -40, width: 150, height: 150, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -60, left: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
 
-        <Link href="/leagues" style={{ fontFamily: 'var(--f-mono)', fontSize: 10, letterSpacing: 0.5, color: 'rgba(255,255,255,0.6)', textDecoration: 'none', display: 'inline-block', marginBottom: 16 }}>
+        <Link href="/leagues" style={{ fontFamily: 'var(--f-mono)', fontSize: 10, letterSpacing: 0.5, color: 'rgba(255,255,255,0.6)', textDecoration: 'none', display: 'inline-block', marginBottom: 12 }}>
           ← Leagues
         </Link>
 
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.15)', marginBottom: 10 }}>
-              <span style={{ fontSize: 12 }}>{modeMeta.icon}</span>
-              <span style={{ fontFamily: 'var(--f-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '1px', color: 'rgba(255,255,255,0.9)', textTransform: 'uppercase' }}>{modeMeta.label}</span>
-            </div>
-            <h1 style={{ fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 28, color: '#fff', lineHeight: 1.1, margin: 0, wordBreak: 'break-word' }}>{league.name}</h1>
-            {league.description && (
-              <p style={{ fontFamily: 'var(--f-body)', fontSize: 13, color: 'rgba(255,255,255,0.65)', marginTop: 6, marginBottom: 0 }}>{league.description}</p>
-            )}
-            <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 8 }}>
-              {scores.length} member{scores.length !== 1 ? 's' : ''}
-            </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.15)' }}>
+            <span style={{ fontSize: 11 }}>{modeMeta.icon}</span>
+            <span style={{ fontFamily: 'var(--f-mono)', fontSize: 8.5, fontWeight: 700, letterSpacing: '1px', color: 'rgba(255,255,255,0.9)', textTransform: 'uppercase' }}>{modeMeta.label}</span>
           </div>
+          <span style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+            {scores.length} member{scores.length !== 1 ? 's' : ''}
+          </span>
         </div>
 
+        <h1 style={{ fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 20, color: '#fff', lineHeight: 1.15, margin: '8px 0 0', wordBreak: 'break-word' }}>{league.name}</h1>
+        {league.description && (
+          <p style={{ fontFamily: 'var(--f-body)', fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 3, marginBottom: 0 }}>{league.description}</p>
+        )}
+
         {/* Invite code strip */}
-        <div style={{ marginTop: 20, padding: '12px 14px', background: 'rgba(0,0,0,0.25)', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 12, backdropFilter: 'blur(8px)' }}>
+        <div style={{ marginTop: 14, padding: '9px 12px', background: 'rgba(0,0,0,0.25)', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12, backdropFilter: 'blur(8px)' }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: 'var(--f-mono)', fontSize: 9, letterSpacing: '1px', color: 'rgba(255,255,255,0.45)', marginBottom: 3 }}>INVITE CODE</div>
-            <div style={{ fontFamily: 'var(--f-mono)', fontSize: 20, fontWeight: 700, color: '#fff', letterSpacing: 4 }}>{league.invite_code}</div>
+            <div style={{ fontFamily: 'var(--f-mono)', fontSize: 8.5, letterSpacing: '1px', color: 'rgba(255,255,255,0.45)', marginBottom: 2 }}>INVITE CODE</div>
+            <div style={{ fontFamily: 'var(--f-mono)', fontSize: 17, fontWeight: 700, color: '#fff', letterSpacing: 3 }}>{league.invite_code}</div>
           </div>
           <CopyInviteButton inviteUrl={inviteUrl} />
         </div>
       </div>
 
       {/* ── STANDINGS ────────────────────────────────── */}
-      <div style={{ padding: '24px 20px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', color: 'var(--ink-3)', textTransform: 'uppercase' }}>Standings</div>
-
-          {showTabs && (
-            <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 10, padding: 3, border: '1px solid var(--line)' }}>
-              {(['picks', 'bracket'] as StandingsTab[]).map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab)}
-                  style={{ padding: '5px 14px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'var(--f-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.5px', transition: 'all .15s', background: activeTab === tab ? 'var(--surface)' : 'transparent', color: activeTab === tab ? 'var(--accent)' : 'var(--ink-3)', boxShadow: activeTab === tab ? '0 1px 4px rgba(0,0,0,0.1)' : 'none' }}>
-                  {tab === 'picks' ? '⚽ Picks' : '🗂 Bracket'}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+      <div style={{ padding: '20px 20px 0' }}>
+        <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', color: 'var(--ink-3)', textTransform: 'uppercase', marginBottom: 12 }}>Standings</div>
 
         {sorted.length === 0 ? (
           <div style={{ padding: '40px 20px', textAlign: 'center', background: 'var(--surface)', border: '1px dashed var(--line)', borderRadius: 18 }}>
@@ -164,72 +132,63 @@ export default function LeagueClient({ league, scores, bracketEntries, currentUs
           </div>
         ) : (
           <>
-            {/* ── PODIUM (top 3) ─────────────────────── */}
-            {top3.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 8, padding: '8px 0 0' }}>
-                  {/* Reorder: 2nd, 1st, 3rd */}
-                  {[top3[1], top3[0], top3[2]].map((s, podiumIdx) => {
-                    if (!s) return <div key={podiumIdx} style={{ flex: 1 }} />
-                    const rank = podiumIdx === 1 ? 1 : podiumIdx === 0 ? 2 : 3
-                    const heights = [72, 100, 56]
-                    const podiumHeight = heights[podiumIdx]
-                    const isMe = s.user_id === currentUserId
-                    const displayName = s.profile?.display_name ?? s.profile?.username ?? 'Player'
-                    const pts = getPoints(s)
-                    const rankColors = ['#c0a060', '#d4af37', '#a0755a']
-                    const rankColor = rankColors[podiumIdx]
-                    return (
-                      <div key={s.user_id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                        {rank === 1 && <span style={{ fontSize: 20 }}>🏆</span>}
-                        <Avatar name={displayName} size={rank === 1 ? 48 : 38} />
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontFamily: 'var(--f-body)', fontWeight: 700, fontSize: 12, color: isMe ? 'var(--accent)' : 'var(--ink)', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {displayName}{isMe && ' 👤'}
-                          </div>
-                          <div style={{ fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 18, color: 'var(--ink)' }}>{pts}</div>
-                        </div>
-                        <div style={{ width: '100%', height: podiumHeight, background: `color-mix(in srgb, ${rankColor} 20%, var(--surface))`, border: `1.5px solid color-mix(in srgb, ${rankColor} 40%, var(--line))`, borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 10 }}>
-                          <span style={{ fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 22, color: rankColor }}>{rank}</span>
-                        </div>
-                      </div>
-                    )
-                  })}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 16, overflowX: 'auto' }}>
+              <div style={{ minWidth: 300 }}>
+                {/* Column headers */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: 'var(--surface-2)', borderBottom: '1px solid var(--line)' }}>
+                  <span style={{ ...headCell, width: 22 }}>#</span>
+                  <span style={{ flex: 1, minWidth: 92, fontFamily: 'var(--f-mono)', fontSize: 9, fontWeight: 700, color: 'var(--ink-3)', letterSpacing: '0.3px' }}>PLAYER</span>
+                  <span style={{ ...headCell, width: 42 }} title="Match picks points">PICKS</span>
+                  <span style={{ ...headCell, width: 48 }} title="Bracket points">BRACKET</span>
+                  <span style={{ ...headCell, width: 50, color: 'var(--ink-2)' }} title="Combined total">TOTAL</span>
+                  <span style={{ width: 14, flexShrink: 0 }} aria-hidden />
                 </div>
-                <div style={{ height: 3, background: 'var(--line)', borderRadius: 2, marginTop: 0 }} />
-              </div>
-            )}
 
-            {/* ── REST OF STANDINGS ──────────────────── */}
-            {rest.length > 0 && (
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 16, overflow: 'hidden' }}>
-                {rest.map((s, i) => {
-                  const rank = i + 4
+                {/* Member rows */}
+                {sorted.map((s, i) => {
+                  const rank = i + 1
                   const isMe = s.user_id === currentUserId
                   const displayName = s.profile?.display_name ?? s.profile?.username ?? 'Player'
-                  const pts = getPoints(s)
-                  const change = getRankChange(s)
+                  const change = s.rank_change ?? 0
                   return (
-                    <div key={s.user_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderTop: i > 0 ? '1px solid var(--line)' : 'none', background: isMe ? 'color-mix(in srgb, var(--accent) 6%, var(--surface))' : 'var(--surface)' }}>
-                      <span style={{ width: 22, fontFamily: 'var(--f-mono)', fontWeight: 700, fontSize: 12, color: 'var(--ink-3)', textAlign: 'center', flexShrink: 0 }}>{rank}</span>
-                      <Avatar name={displayName} size={30} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontFamily: 'var(--f-body)', fontWeight: isMe ? 700 : 600, fontSize: 14, color: isMe ? 'var(--accent)' : 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {displayName}
-                          {isMe && <span style={{ fontFamily: 'var(--f-mono)', fontSize: 8, color: 'var(--accent)', marginLeft: 6 }}>YOU</span>}
-                        </div>
-                        {change !== 0 && (
-                          <div style={{ fontFamily: 'var(--f-mono)', fontSize: 9, color: change > 0 ? 'var(--win)' : 'var(--live)', marginTop: 1 }}>
-                            {change > 0 ? `▲ ${change}` : `▼ ${Math.abs(change)}`}
+                    <Link key={s.user_id} href={`/leagues/${league.id}/picks/${s.user_id}`} style={{
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
+                      borderTop: i ? '1px solid var(--line)' : 'none',
+                      background: isMe ? 'color-mix(in srgb, var(--accent) 7%, var(--surface))' : 'var(--surface)',
+                      textDecoration: 'none', color: 'inherit', cursor: 'pointer',
+                    }}>
+                      <span style={{ width: 22, textAlign: 'center', flexShrink: 0 }}>
+                        {rank <= 3
+                          ? <span style={{ fontSize: 14 }}>{medals[rank - 1]}</span>
+                          : <span style={{ fontFamily: 'var(--f-mono)', fontWeight: 700, fontSize: 12, color: 'var(--ink-3)' }}>{rank}</span>}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 92, display: 'flex', alignItems: 'center', gap: 9 }}>
+                        <Avatar name={displayName} size={28} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontFamily: 'var(--f-body)', fontWeight: isMe ? 700 : 600, fontSize: 14, color: isMe ? 'var(--accent)' : 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {displayName}
+                            {isMe && <span style={{ fontFamily: 'var(--f-mono)', fontSize: 8, color: 'var(--accent)', marginLeft: 6 }}>YOU</span>}
                           </div>
-                        )}
+                          {change !== 0 && (
+                            <div style={{ fontFamily: 'var(--f-mono)', fontSize: 9, color: change > 0 ? 'var(--win)' : 'var(--live)', marginTop: 1 }}>
+                              {change > 0 ? `▲ ${change}` : `▼ ${Math.abs(change)}`}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <span style={{ fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 20, color: 'var(--ink)' }}>{pts}</span>
-                    </div>
+                      <span style={{ ...numCell, width: 42 }}>{picksOf(s)}</span>
+                      <span style={{ ...numCell, width: 48 }}>{bracketOf(s)}</span>
+                      <span style={{ ...numCell, width: 50, fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 17, color: 'var(--ink)' }}>{totalOf(s)}</span>
+                      <span style={{ width: 14, flexShrink: 0, textAlign: 'center', color: 'var(--ink-3)', fontSize: 15, lineHeight: 1 }}>›</span>
+                    </Link>
                   )
                 })}
               </div>
-            )}
+            </div>
+
+            <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--ink-3)', marginTop: 8, lineHeight: 1.5 }}>
+              TOTAL = picks + bracket. Tap a player to see their full picks &amp; bracket.
+            </div>
           </>
         )}
       </div>
@@ -239,14 +198,6 @@ export default function LeagueClient({ league, scores, bracketEntries, currentUs
         <div className="wc-section-head" style={{ margin: '0 0 10px' }}>Chat</div>
         <LeagueChat leagueId={league.id} userId={currentUserId} username={currentProfile?.username ?? 'you'} />
       </div>
-
-      {/* ── BRACKET REVIEWS ──────────────────────────── */}
-      {(mode === 'bracket' || mode === 'both' || mode === 'combined') && bracketEntries.length > 0 && (
-        <div style={{ padding: '28px 20px 0' }}>
-          <div className="wc-section-head" style={{ margin: '0 0 10px' }}>Bracket Reviews</div>
-          <BracketReviewer entries={bracketEntries} currentUserId={currentUserId} tournamentResults={tournamentResults} />
-        </div>
-      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 # Authentication & Onboarding
 
-_Last updated: 2026-06-05_
+_Last updated: 2026-06-08_
 
 Soccer Fantasy Game uses **Supabase Auth** through `@supabase/ssr`, so sessions
 work in Server Components, Route Handlers, and middleware. The app runs under
@@ -68,11 +68,11 @@ Auth redirect URLs are **not** managed by code/migrations — set them once in
 ## Verification status
 
 The end-to-end flow was reasoned through and each file verified complete on
-disk. A full `next build` / `tsc` could **not** be run in this session: the
-sandbox's mounted view of the repo intermittently returned truncated/NUL-padded
-copies of source files (including untouched ones), which produces phantom parse
-errors. The real working-tree files are intact. Re-run `npm run build` locally
-to confirm before deploying.
+disk; the auth/onboarding RLS (`profiles` INSERT/UPDATE, `handle_new_user`) is
+confirmed live in project `vgguaeutmljgvxdcfmkd`. Automated checks (`npm test`,
+`npx tsc --noEmit`) can't run in the Cowork Linux sandbox because the repo's
+`node_modules` were installed on Windows (the Linux-native rollup/esbuild
+binaries are absent) — run them locally to confirm green before deploying.
 
 ### Manual test checklist
 

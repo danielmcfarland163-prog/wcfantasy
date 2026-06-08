@@ -27,21 +27,6 @@ export default async function LeaguePage({ params }: { params: Promise<{ id: str
     .eq('league_id', id)
     .order('total_points', { ascending: false })
 
-  const { data: members } = await supabase
-    .from('league_members').select('user_id').eq('league_id', id)
-  const memberIds = (members ?? []).map((m: any) => m.user_id)
-
-  const { data: bracketEntries } = await supabase
-    .from('bracket_entries')
-    .select('*, profile:profiles(username, display_name)')
-    .in('user_id', memberIds.length > 0 ? memberIds : ['00000000-0000-0000-0000-000000000000'])
-
-  const { data: tournamentResults } = await supabase
-    .from('tournament_results')
-    .select('*')
-    .eq('id', 1)
-    .single()
-
   const inviteUrl = generateInviteUrl(league.invite_code)
 
   return (
@@ -49,11 +34,9 @@ export default async function LeaguePage({ params }: { params: Promise<{ id: str
       <LeagueClient
         league={league}
         scores={scores ?? []}
-        bracketEntries={bracketEntries ?? []}
         currentUserId={user.id}
         currentProfile={profile}
         inviteUrl={inviteUrl}
-        tournamentResults={tournamentResults ?? null}
       />
     </AppShell>
   )

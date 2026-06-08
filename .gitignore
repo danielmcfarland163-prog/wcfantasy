@@ -10,3 +10,8 @@ node_modules/
 Soccer Fantasy Game/
 Soccer Fantasy Game.zip
 dist/
+
+# backups
+*.tgz
+
+.wrangler/

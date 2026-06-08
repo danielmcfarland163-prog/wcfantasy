@@ -2,7 +2,6 @@
 // Both functions accept an admin SupabaseClient so they can be composed.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { scorePick } from './scoring'
 import { scoreBracketEntry } from './bracket-scoring'
 
 // ── Picks scoring ─────────────────────────────────────────────────────────────
@@ -10,132 +9,17 @@ import { scoreBracketEntry } from './bracket-scoring'
 export async function scorePicks(
   supabase: SupabaseClient,
 ): Promise<{ scored: number; users: number }> {
-  // Finished matches with scores
-  const { data: finishedMatches } = await supabase
-    .from('matches')
-    .select('id, home_score, away_score')
-    .eq('status', 'FINISHED')
-    .not('home_score', 'is', null)
-    .not('away_score', 'is', null)
-
-  if (!finishedMatches?.length) return { scored: 0, users: 0 }
-
-  const finishedIds = finishedMatches.map((m: any) => m.id)
-  const scoreMap = Object.fromEntries(
-    finishedMatches.map((m: any) => [m.id, { home: m.home_score as number, away: m.away_score as number }]),
-  )
-
-  // Unscored picks for those matches
-  const { data: unscoredPicks } = await supabase
-    .from('picks')
-    .select('id, user_id, match_id, home_score_pick, away_score_pick, confidence_multiplier')
-    .is('scored_at', null)
-    .in('match_id', finishedIds)
-
-  // Score each pick with the scoreline model: 0 (wrong) / 3 (correct outcome) /
-  // 5 (exact score), multiplied by the confidence multiplier (1×/2×/3×).
-  const updates: Array<{ id: string; user_id: string; points: number; result: 'EXACT' | 'CORRECT' | 'WRONG' }> = []
-  for (const pick of (unscoredPicks ?? []) as any[]) {
-    const scores = scoreMap[pick.match_id]
-    if (!scores) continue
-    const { points, result } = scorePick(
-      {
-        home_score_pick: pick.home_score_pick ?? 0,
-        away_score_pick: pick.away_score_pick ?? 0,
-        confidence_multiplier: pick.confidence_multiplier ?? 1,
-      },
-      { home_score: scores.home, away_score: scores.away },
-    )
-    updates.push({ id: pick.id, user_id: pick.user_id, points, result })
-  }
-
-  // Persist per-pick scores for any newly-scored picks (may be none on a re-run).
-  if (updates.length) {
-    await Promise.all(updates.map(u =>
-      supabase.from('picks').update({
-        points_earned: u.points,
-        pick_result:   u.result,
-        scored_at:     new Date().toISOString(),
-      }).eq('id', u.id),
-    ))
-  }
-
-  // Re-aggregate standings for EVERY user with any scored pick. This ALWAYS runs,
-  // even when there were no new picks to score, so re-running "Score picks" reliably
-  // repairs a zeroed or partial aggregation instead of being a no-op once picks are
-  // marked scored. It is idempotent: recomputing over scored picks yields the same totals.
-  const { data: scoredRows } = await supabase
-    .from('picks')
-    .select('user_id, points_earned, pick_result')
-    .not('scored_at', 'is', null)
-
-  type Agg = { pts: number; correct: number; exact: number; made: number }
-  const byUser = new Map<string, Agg>()
-  for (const r of (scoredRows ?? []) as any[]) {
-    const a = byUser.get(r.user_id) ?? { pts: 0, correct: 0, exact: 0, made: 0 }
-    a.pts += r.points_earned ?? 0
-    if (r.pick_result === 'EXACT') { a.exact++; a.correct++ }
-    else if (r.pick_result === 'CORRECT') { a.correct++ }
-    a.made++
-    byUser.set(r.user_id, a)
-  }
-
-  for (const [userId, a] of byUser) {
-    // Preserve any bracket points when computing the combined total
-    const { data: existing } = await supabase
-      .from('global_scores')
-      .select('bracket_points')
-      .eq('user_id', userId)
-      .single()
-    const bracketPts = existing?.bracket_points ?? 0
-
-    await supabase.from('global_scores').upsert({
-      user_id:         userId,
-      picks_points:    a.pts,
-      picks_correct:   a.correct,
-      exact_scores:    a.exact,
-      correct_results: a.correct,
-      picks_made:      a.made,
-      total_points:    a.pts + bracketPts,
-      updated_at:      new Date().toISOString(),
-    }, { onConflict: 'user_id' })
-
-    const { data: leagues } = await supabase
-      .from('league_members')
-      .select('league_id')
-      .eq('user_id', userId)
-
-    for (const lm of (leagues ?? []) as any[]) {
-      // Write the Picks-mode columns; bracket_points is preserved and the
-      // combined total_points is recomputed by recalculate_league_rankings().
-      await supabase.from('league_scores').upsert({
-        league_id:       lm.league_id,
-        user_id:         userId,
-        picks_points:    a.pts,
-        total_points:    a.pts,
-        correct_results: a.correct,
-        exact_scores:    a.exact,
-        picks_made:      a.made,
-        updated_at:      new Date().toISOString(),
-      }, { onConflict: 'league_id,user_id' })
-      await supabase.rpc('recalculate_league_rankings', { p_league_id: lm.league_id })
-    }
-  }
-
-  // Recompute global ranks by total points
-  const { data: allScores } = await supabase
-    .from('global_scores')
-    .select('user_id')
-    .order('total_points', { ascending: false })
-
-  for (let i = 0; i < (allScores ?? []).length; i++) {
-    await supabase
-      .from('global_scores')
-      .update({ global_rank: i + 1 })
-      .eq('user_id', (allScores as any[])[i].user_id)
-  }
-
-  return { scored: updates.length, users: byUser.size }
+  // All pick scoring + standings aggregation runs in ONE set-based DB call
+  // (public.score_picks). The previous implementation fanned out one REST
+  // request per pick and per user via Promise.all; on Cloudflare Workers that
+  // exceeded the subrequest / 6-concurrent-connection limit and routinely left
+  // global_scores un-aggregated — the "scored N picks across 0 users" /
+  // 0-points-on-Stats bug. The RPC is idempotent: re-running it rebuilds
+  // standings from the scored picks, so it also repairs a zeroed aggregation.
+  const { data, error } = await supabase.rpc('score_picks')
+  if (error) throw new Error(`score_picks failed: ${error.message}`)
+  const r = (data ?? {}) as { scored?: number; users?: number }
+  return { scored: r.scored ?? 0, users: r.users ?? 0 }
 }
 
 // ── Bracket scoring ───────────────────────────────────────────────────────────

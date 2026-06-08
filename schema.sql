@@ -128,29 +128,6 @@ CREATE POLICY "Users update own picks before kickoff" ON picks FOR UPDATE
   );
 
 -- =============================================
--- TOURNAMENT PICKS (champion + golden boot)
--- =============================================
-CREATE TABLE tournament_picks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE UNIQUE NOT NULL,
-  champion_team_id UUID REFERENCES teams(id),
-  runner_up_team_id UUID REFERENCES teams(id),
-  golden_boot_player TEXT,
-  champion_points INTEGER DEFAULT 0,
-  runner_up_points INTEGER DEFAULT 0,
-  golden_boot_points INTEGER DEFAULT 0,
-  locked BOOLEAN DEFAULT false,  -- locks after group stage
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-ALTER TABLE tournament_picks ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Tournament picks readable by all after lock" ON tournament_picks FOR SELECT
-  USING (auth.uid() = user_id OR locked = true);
-CREATE POLICY "Users manage own tournament picks" ON tournament_picks FOR ALL
-  USING (auth.uid() = user_id AND NOT locked);
-
--- =============================================
 -- LEAGUES
 -- =============================================
 CREATE TABLE leagues (
@@ -272,10 +249,7 @@ CREATE TABLE scoring_config (
 
 INSERT INTO scoring_config (key, value, description) VALUES
   ('correct_result_pts', 3, 'Points for predicting correct W/D/L result'),
-  ('exact_score_bonus', 2, 'Bonus points on top of correct result for exact score'),
-  ('champion_pts', 10, 'Points for correct tournament champion'),
-  ('runner_up_pts', 5, 'Points for correct runner-up'),
-  ('golden_boot_pts', 5, 'Points for correct golden boot winner');
+  ('exact_score_bonus', 2, 'Bonus points on top of correct result for exact score');
 
 ALTER TABLE scoring_config ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Scoring config readable by all" ON scoring_config FOR SELECT USING (true);

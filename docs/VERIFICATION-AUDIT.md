@@ -1,8 +1,13 @@
 # Soccer Fantasy Game — Full Verification & Validation Audit
 
-**Purpose:** Complete code, UI/UX, functionality, and gaps audit across all features  
-**Date:** 2026-06-05  
-**Status:** Ready to Run
+**Purpose:** Reusable V&V checklist — the master prompt/framework for auditing the app across all features.
+**Created:** 2026-06-05
+**Last run:** 2026-06-08 → results in [`2026-06-08-gap-analysis-report.md`](2026-06-08-gap-analysis-report.md)
+**Status:** Framework (run as needed)
+
+> This document is the **audit checklist**, not the findings. For the current state of the app —
+> completed features, gaps, severities, and recommendations — read the latest gap-analysis report
+> linked above. Re-run this checklist after major changes and append a new dated report.
 
 ---
 
@@ -144,12 +149,8 @@ Conduct a COMPLETE verification across these dimensions:
 - [ ] `rank` and `rank_change` fields updated per league and mode
 - [ ] Global rankings also updated
 
-### 9. TOURNAMENT BONUS PICKS
-- [ ] After group stage lock, user can pick: Champion, Runner-up, Golden Boot
-- [ ] One-time picks, 10/5/5 points respectively
-- [ ] Locked at group stage end date
-- [ ] Visible on picks page as bonus section
-- [ ] Results trigger scoring when tournament ends
+### 9. Tournament Bonus Picks — Descoped (2026-06-08)
+Removed from scope — no longer a verification target. See the CHANGELOG and `DEPLOYMENT-PLANS.md` §10.
 
 ### 10. ADMIN PANEL
 - [ ] `/admin` page restricted to admins
@@ -268,6 +269,10 @@ Audit is **complete** when:
 ## Next Steps
 
 1. **Run the Master Verification Prompt** — execute the prompt above against the codebase
-2. **Generate Gap Analysis Report** — consolidate findings
+2. **Generate Gap Analysis Report** — consolidate findings into a new dated `YYYY-MM-DD-gap-analysis-report.md`
 3. **Develop Deployment Prompts** — for each Critical/High gap (see DEPLOYMENT-PLANS.md)
+
+### Report history
+
+- **2026-06-08** — [`2026-06-08-gap-analysis-report.md`](2026-06-08-gap-analysis-report.md) (current). ~83% to v1; fixed a live `score_picks()` anon-exec hole; flagged git-index corruption. Supersedes the two 2026-06-06 reports (removed).
 

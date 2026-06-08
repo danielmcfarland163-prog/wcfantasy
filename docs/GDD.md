@@ -1,7 +1,7 @@
 # Soccer Fantasy Game — Product Design Document
 
-**Version:** 0.2  
-**Last Updated:** 2026-06-05  
+**Version:** 0.4  
+**Last Updated:** 2026-06-08  
 **Platform:** Web (mobile-first)  
 **Stack:** Next.js, TypeScript, Tailwind CSS, Cloudflare Workers, Supabase
 
@@ -29,7 +29,6 @@ Users predict the exact scoreline for every match before kickoff, with an option
 - Predict home and away score for each match
 - Apply a confidence multiplier: 1×, 2×, or 3×
 - Picks lock at each match's kickoff time
-- Tournament picks (champion, runner-up, golden boot) lock after the group stage ends
 
 **Scoring:**
 
@@ -39,15 +38,7 @@ Users predict the exact scoreline for every match before kickoff, with an option
 | Correct outcome (W/D/L) | 3 | 3 × multiplier |
 | Exact score | 5 (3 + 2 bonus) | 5 × multiplier |
 
-**Tournament bonus picks (one-time, locked after group stage):**
-
-| Pick | Points |
-|------|--------|
-| Correct champion | 10 |
-| Correct runner-up | 5 |
-| Correct golden boot | 5 |
-
-**Maximum possible points:** 80+ matches × 5pts × 3× multiplier + 20 tournament bonus = 1,220 pts theoretical max.
+**Maximum possible points:** every match predicted at the exact score with a 3× multiplier — e.g. the 72 seeded group matches × 5 pts × 3× = 1,080 pts, before knockout fixtures are added post-draw.
 
 **Results populate to:** `picks` table (per match), `global_scores`, `league_scores.picks_points`.
 
@@ -95,22 +86,21 @@ Users fill out a complete tournament bracket before the first match kicks off. T
 - Max 50 members per league (configurable)
 - Public leagues are discoverable; private leagues require an invite code
 
-### 3.2 Dual-Mode Leaderboards
+### 3.2 League Standings (dual-mode, single table)
 
-Each league shows **two leaderboard tabs** — one per game mode. They are independent; a user's rank in one tab has no bearing on the other.
+Each league shows **one standings table with three score columns per member — Picks, Bracket, and Total — sorted by the combined total.** The two modes are still scored independently (a strong bracket can't dilute a weak picks score and vice-versa); the table simply surfaces both at once instead of behind a tab switcher.
 
 ```
 League: "The Lads ⚽"
-┌─────────────┬──────────────┐
-│  My Picks   │   Bracket    │
-└─────────────┴──────────────┘
-  # Player      Pts   Exact
-  1 Dan        142    8
-  2 Alex       138    7
+  # Player     Picks  Bracket  Total
+  1 Dan          142       25    167   ›
+  2 Alex         138       19    157   ›
   ...
 ```
 
-**Schema:** `league_scores` stores `picks_points` and `bracket_points` as separate columns. Each has its own `rank` and `rank_change` pair. See [`../deployment/schema-dual-mode.sql`](deployment/schema-dual-mode.sql) for the migration.
+Tapping a row opens that member's read-only **player summary** (`/leagues/[id]/picks/[userId]`) — a Picks / Bracket tabbed view with their pick-by-pick scorelines (predicted vs. actual, Exact / Correct / Missed chips, confidence multiplier) and their full bracket with ✓/✗ vs. results. Another member's picks appear once the match is LIVE/FINISHED, and their bracket only after the tournament lock (admins can preview earlier).
+
+**Schema:** `league_scores` stores `picks_points` and `bracket_points` as separate columns, each with its own `rank` / `rank_change` pair; `total_points = picks + bracket` is recomputed by `recalculate_league_rankings()`. See [`../deployment/schema-dual-mode.sql`](deployment/schema-dual-mode.sql) for the migration.
 
 ### 3.3 Global Leaderboard
 
@@ -120,7 +110,7 @@ League: "The Lads ⚽"
 
 | Event | Action |
 |-------|--------|
-| Match finishes | `api/score-picks` runs → updates `picks.points_earned` → recalculates `league_scores.picks_points` + `global_scores` |
+| Match finishes | `api/score-picks` runs the set-based `public.score_picks()` RPC → scores `picks.points_earned` → rebuilds `league_scores.picks_points` + `global_scores` + ranks in one DB round-trip |
 | Admin updates bracket results | `api/score-bracket` runs → updates `league_scores.bracket_points` + `global_scores` |
 | Either score update | `recalculate_league_rankings()` called per affected league |
 
@@ -174,8 +164,10 @@ League: "The Lads ⚽"
 | Hosting | Cloudflare Workers via OpenNext |
 | Database | Supabase (Postgres + RLS + Realtime) |
 | Auth | Supabase Auth |
-| Live scores | `api/sync-scores` cron → football-data.org |
-| Scoring | `api/score-picks`, `api/score-bracket` (triggered post-match) |
+| Live scores | `api/sync-scores` (LIVE-aware) + `api/sync-fixtures` (knockout generation) ← football-data.org |
+| Scoring | `api/score-picks` (set-based `score_picks()` RPC), `api/score-bracket` — shared values in `lib/bracket-scoring.ts` |
+| Automation | Standalone `cron-worker/` Worker: `*/5` sync+score-picks, `0 */6` fixtures+score-bracket, `0 18` reminders |
+| Testing | Vitest unit tests for the scoring engines; CI **Test** step gates the deploy |
 
 ---
 
@@ -188,4 +180,7 @@ League: "The Lads ⚽"
 | My Picks core | Scoreline + confidence predictions, locking, live scoring, result badges | Complete (2026-06-06) |
 | Bracket core | Sequential picker, lock + 24h countdown, submit confirmation, spec scoring, reviewer | Complete (2026-06-06) |
 | v0.3 | Dual-mode league standings schema | Complete (2026-06-06) |
-| v1.0 | Full tournament launch | Pending |
+| Live automation | Cron worker, LIVE sync, knockout fixtures, client realtime; tests + CI gate | Complete (2026-06-06) |
+| Standings redesign | Picks/Bracket/Total table + tap-through player summaries; status-based picks visibility; set-based `score_picks()` RPC | Complete (2026-06-07) |
+| Hardening & audit | Team dedupe (48), `score_picks()` locked to service_role, docs refresh, stale-file cleanup | Complete (2026-06-08) |
+| v1.0 | Full tournament launch (knockouts seeded post-draw, deploy verified) | Pending |

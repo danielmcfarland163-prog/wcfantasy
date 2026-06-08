@@ -61,18 +61,6 @@ export interface Pick {
   match?: Match
 }
 
-export interface TournamentPick {
-  id: string
-  user_id: string
-  champion_team_id: string | null
-  runner_up_team_id: string | null
-  golden_boot_player: string | null
-  locked: boolean
-  // joined
-  champion_team?: Team
-  runner_up_team?: Team
-}
-
 export interface League {
   id: string
   name: string
@@ -139,9 +127,6 @@ export interface BracketEntry {
 export interface ScoringConfig {
   correct_result_pts: number
   exact_score_bonus: number
-  champion_pts: number
-  runner_up_pts: number
-  golden_boot_pts: number
 }
 
 // Match with user's pick attached (for picks page)
