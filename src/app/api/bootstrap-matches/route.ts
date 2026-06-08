@@ -1,16 +1,18 @@
-// ONE-TIME SETUP: POST to this route to seed all 2026 WC matches from football-data.org
-// Call it once after deploying. Delete or protect afterwards.
+// POST /api/bootstrap-matches — one-shot seed of 2026 WC teams + matches from football-data.org.
+// Destructive (service-role upserts over teams + matches). Superseded by /api/seed-teams (teams)
+// + /api/sync-fixtures (idempotent schedule incl. knockouts); kept only for first-run setup.
+// Auth: CRON_SECRET (cron worker) OR an admin session — via the shared isCronOrAdmin guard.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase-server'
+import { isCronOrAdmin } from '@/lib/api-auth'
 
 const FD_API_KEY = process.env.FOOTBALL_DATA_API_KEY!
 const WC_COMPETITION_CODE = 'WC'
 const FD_BASE = 'https://api.football-data.org/v4'
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!(await isCronOrAdmin(req))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
