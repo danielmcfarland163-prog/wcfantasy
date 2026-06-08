@@ -1,9 +1,20 @@
 /**
  * soccer-fantasy-cron
  *
- * Standalone Cloudflare Worker that fires on several schedules and calls the
- * Next.js API routes deployed with the app. Each schedule runs an ordered list
- * of steps sequentially (e.g. sync scores, THEN score the now-finished picks).
+ * Standalone Cloudflare Worker that drives the app's scheduled jobs by calling
+ * its Next.js API routes. Cloudflare caps cron triggers at 5 PER ACCOUNT (Free
+ * plan), shared across every Worker — so instead of registering one trigger per
+ * cadence, this Worker registers a SINGLE trigger (every 5 minutes) and decides
+ * which job groups to run from the scheduled tick time. That keeps this Worker's
+ * account-wide cron usage at 1, leaving headroom for everything else.
+ *
+ * Cadences (all UTC), each an ordered list run sequentially:
+ *   every 5 min        → sync-scores → score-picks        (live scores, then score finished picks)
+ *   every 6h, on hour  → sync-fixtures → derive-results → score-bracket
+ *   daily 18:00        → notify-picks-reminder
+ *
+ * Because the single every-5-minute trigger also fires at every :00 (00/06/12/18), the
+ * 6-hourly and daily groups are detected by checking the tick's hour/minute.
  *
  * Required secrets (set via `wrangler secret put`):
  *   APP_URL      — base URL of the deployment INCLUDING the basePath, no trailing slash.
@@ -20,26 +31,40 @@ export interface Env {
 
 type Step = { path: string; label: string }
 
-// Each cron expression (must match wrangler.toml [triggers].crons) maps to an
-// ordered list of route calls executed one after another.
-const SCHEDULES: Record<string, Step[]> = {
-  // Every 5 min: pull live/finished scores, then score any newly-finished picks.
-  '*/5 * * * *': [
-    { path: '/api/sync-scores', label: 'sync-scores' },
-    { path: '/api/score-picks', label: 'score-picks' },
-  ],
-  // Every 6 hours: pick up knockout fixtures as they resolve, derive the real
-  // tournament_results (group standings + knockout winners) from the match rows,
-  // then rescore brackets against those results.
-  '0 */6 * * *': [
-    { path: '/api/sync-fixtures', label: 'sync-fixtures' },
-    { path: '/api/derive-results', label: 'derive-results' },
-    { path: '/api/score-bracket', label: 'score-bracket' },
-  ],
-  // Daily 18:00 UTC: email reminders for matches locking in the next 24h.
-  '0 18 * * *': [
-    { path: '/api/notify-picks-reminder', label: 'notify-picks-reminder' },
-  ],
+// Ordered job groups, selected per tick by `stepsForTick` below.
+const EVERY_5_MIN: Step[] = [
+  { path: '/api/sync-scores', label: 'sync-scores' },
+  { path: '/api/score-picks', label: 'score-picks' },
+]
+
+const EVERY_6_HOURS: Step[] = [
+  { path: '/api/sync-fixtures', label: 'sync-fixtures' },
+  { path: '/api/derive-results', label: 'derive-results' },
+  { path: '/api/score-bracket', label: 'score-bracket' },
+]
+
+const DAILY_1800_UTC: Step[] = [
+  { path: '/api/notify-picks-reminder', label: 'notify-picks-reminder' },
+]
+
+/**
+ * Build the ordered step list for a given scheduled tick. `scheduledTime` is the
+ * epoch-ms tick boundary Cloudflare scheduled (not the actual invocation time),
+ * so its minute is always a clean multiple of 5 and its seconds are 0 — making
+ * the on-the-hour checks below exact.
+ *
+ * Exported so the cadence logic can be unit-tested without a live trigger.
+ */
+export function stepsForTick(scheduledTimeMs: number): Step[] {
+  const tick = new Date(scheduledTimeMs)
+  const minute = tick.getUTCMinutes()
+  const hour = tick.getUTCHours()
+  const onTheHour = minute === 0
+
+  const steps: Step[] = [...EVERY_5_MIN]
+  if (onTheHour && hour % 6 === 0) steps.push(...EVERY_6_HOURS)
+  if (onTheHour && hour === 18) steps.push(...DAILY_1800_UTC)
+  return steps
 }
 
 async function callRoute(env: Env, step: Step): Promise<void> {
@@ -75,11 +100,8 @@ async function runSteps(env: Env, steps: Step[]): Promise<void> {
 
 export default {
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    const steps = SCHEDULES[controller.cron]
-    if (!steps) {
-      console.warn(`[cron] No handler for schedule: ${controller.cron}`)
-      return
-    }
+    const steps = stepsForTick(controller.scheduledTime)
+    console.log(`[cron] tick ${new Date(controller.scheduledTime).toISOString()} → ${steps.map((s) => s.label).join(', ')}`)
     ctx.waitUntil(runSteps(env, steps))
   },
 } satisfies ExportedHandler<Env>

@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+### Fix: cron deploy failing on Cloudflare's 5-trigger account cap (2026-06-08)
+
+- **Symptom.** CI deploy of `soccer-fantasy-cron` failed at the schedule-registration step with `code: 10072` — *"You have exceeded the limit of 5 cron triggers."* The Worker uploaded fine; only the cron registration was rejected. Cloudflare counts cron triggers **per account** (cap 5 on the Free plan), across every Worker — and the leftover pre-rebrand `wcfantasy-cron` (3 triggers) plus this Worker's 3 pushed the account over 5.
+- **Fix — single-trigger dispatch.** `cron-worker/wrangler.toml` now registers **one** trigger (`*/5 * * * *`) instead of three. `cron-worker/src/index.ts` adds a pure, exported `stepsForTick(scheduledTimeMs)` that selects the job groups from the tick's UTC time: every-5-min jobs always run; the 6-hourly group runs when `minute == 0 && hour % 6 == 0` (00/06/12/18); the daily reminder when `hour == 18 && minute == 0`. This works because `*/5` already fires at every `:00`. Account-wide cron usage for this Worker drops from **3 → 1**. The `scheduled()` handler now dispatches off `controller.scheduledTime` rather than `controller.cron`.
+- **Verified.** `tsc --strict` clean; simulated all 288 daily ticks — base jobs on every tick, 6-hourly group exactly 4×/day, daily reminder exactly once at 18:00, correct ordering (at 18:00 all three groups run in sequence), zero discrepancies.
+- **Still recommended.** Delete the abandoned `wcfantasy` / `wcfantasy-cron` Workers to reclaim their 3 trigger slots (already flagged as cleanup in `DEPLOY-CLOUDFLARE.md`). The single-trigger change makes the deploy resilient, but only frees budget if at least one of the 5 slots is open.
+- **Docs.** `docs/deployment/DEPLOY-CLOUDFLARE.md` cron section rewritten for the single-trigger model, plus a note on the account-wide budget and the `10072` error.
+
 ### Format change: no confidence multiplier + two bracket modes (2026-06-08)
 
 - **My Picks — confidence multiplier removed.** Every match is now a flat 0 / 3 / 5 (wrong / correct outcome / exact score); the 1×/2×/3× selector is gone from the match card, the locked-pick badge, the preview line, and the league member view. `lib/scoring.ts` (`scorePick`, `previewPickPoints`, `scoreAllPicksForMatch`) and `scoring.test.ts` updated; new migration `migrations/2026-06-08_drop_confidence_from_score_picks.sql` re-issues `public.score_picks()` without the `* confidence_multiplier` factor. The `picks.confidence_multiplier` column is **kept** (defaults to 1) for back-compat — it just no longer affects scoring. Optional backfill block re-scores any picks scored before the change.

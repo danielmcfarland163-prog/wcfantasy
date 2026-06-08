@@ -78,21 +78,27 @@ git log -1 --format='%h %ci %s'      # the commit CI last deployed
 git status -s                        # uncommitted changes are NOT deployed until pushed
 ```
 
-Then in the Cloudflare dashboard → **Workers & Pages**, check `soccer-fantasy` and `soccer-fantasy-cron` **Last modified** ≥ your last `main` push, and `soccer-fantasy-cron` → **Triggers** shows the three crons below.
+Then in the Cloudflare dashboard → **Workers & Pages**, check `soccer-fantasy` and `soccer-fantasy-cron` **Last modified** ≥ your last `main` push, and `soccer-fantasy-cron` → **Triggers** shows the single `*/5 * * * *` cron below.
 
-> **Cleanup — delete the pre-rebrand Workers.** The account still has `wcfantasy` and `wcfantasy-cron` (the old build). They are not referenced by any current `wrangler.toml`. Delete once `soccer-fantasy*` is confirmed healthy: `npx wrangler delete --name wcfantasy` / `--name wcfantasy-cron`.
+> **Cron-trigger budget (account-wide cap of 5 on the Free plan).** Cloudflare counts cron triggers across **every** Worker on the account, not per Worker. `soccer-fantasy-cron` now registers just **one** trigger (`*/5 * * * *`) and fans out to the 6-hourly/daily jobs by tick time in `src/index.ts` (`stepsForTick`), so it consumes 1 of 5. If a deploy fails with `code: 10072` ("exceeded the limit of 5 cron triggers"), free up budget by deleting stale Workers' triggers.
+
+> **Cleanup — delete the pre-rebrand Workers (frees cron budget).** The account still has `wcfantasy` and `wcfantasy-cron` (the old build); `wcfantasy-cron` holds 3 stale cron triggers that count against the cap of 5. They are not referenced by any current `wrangler.toml`. Delete once `soccer-fantasy*` is confirmed healthy: `npx wrangler delete --name wcfantasy` / `--name wcfantasy-cron`.
 
 ---
 
 ## Cron schedules (`cron-worker/wrangler.toml` → `src/index.ts`)
 
-| Cron (UTC) | Steps (run in order) | Purpose |
-|---|---|---|
-| `*/5 * * * *` | `sync-scores` → `score-picks` | Live/finished scores, then score newly-finished picks |
-| `0 */6 * * *` | `sync-fixtures` → `derive-results` → `score-bracket` | Knockout fixtures, derive real results, rescore brackets |
-| `0 18 * * *` | `notify-picks-reminder` | Daily reminder email (needs `RESEND_*`) |
+**One registered trigger** (`*/5 * * * *`); `stepsForTick()` in `src/index.ts` selects the job groups by the tick's UTC time. Because `*/5` also fires at every `:00`, the on-the-hour groups are detected there — no separate triggers needed (keeps account cron usage at 1 of 5).
 
-> ⚠️ Earlier revisions listed `*/15 sync-scores` and `*/10 score-picks` — stale. The schedules above are authoritative.
+| Effective cadence (UTC) | Steps (run in order) | Selected when | Purpose |
+|---|---|---|---|
+| Every 5 min | `sync-scores` → `score-picks` | always | Live/finished scores, then score newly-finished picks |
+| Every 6h on the hour | `sync-fixtures` → `derive-results` → `score-bracket` | `minute == 0 && hour % 6 == 0` (00/06/12/18) | Knockout fixtures, derive real results, rescore brackets |
+| Daily 18:00 | `notify-picks-reminder` | `hour == 18 && minute == 0` | Daily reminder email (needs `RESEND_*`) |
+
+At 18:00 UTC all three groups run in one tick, in the order above. The single trigger replaced three separate crons (`*/5`, `0 */6`, `0 18`) to stay within Cloudflare's account-wide cap of 5 cron triggers.
+
+> ⚠️ Earlier revisions listed `*/15 sync-scores` and `*/10 score-picks`, and later three separate crons — both stale. The single-trigger dispatch above is authoritative.
 
 ---
 

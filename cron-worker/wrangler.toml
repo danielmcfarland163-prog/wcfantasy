@@ -3,12 +3,14 @@ main = "src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
-# Cron schedules — each maps to an ordered step list in src/index.ts (SCHEDULES).
-#   */5  → sync-scores  → score-picks      (live scores + score finished matches)
-#   0 */6 → sync-fixtures → score-bracket  (pick up knockouts + rescore brackets)
-#   0 18 → notify-picks-reminder           (daily reminder email, 18:00 UTC)
+# Cloudflare caps cron triggers at 5 PER ACCOUNT (Free plan), shared across all
+# Workers. So this Worker registers ONE trigger and fans out to the right job
+# group by tick time inside src/index.ts (stepsForTick). Account cron usage = 1.
+#   every 5 min       → sync-scores → score-picks
+#   every 6h on hour  → sync-fixtures → derive-results → score-bracket   (00/06/12/18 UTC)
+#   daily 18:00 UTC   → notify-picks-reminder
 [triggers]
-crons = ["*/5 * * * *", "0 */6 * * *", "0 18 * * *"]
+crons = ["*/5 * * * *"]
 
 # Secrets (set via `wrangler secret put`):
 #   CRON_SECRET   — must match the app's runtime env var
