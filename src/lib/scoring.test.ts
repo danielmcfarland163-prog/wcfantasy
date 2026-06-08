@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getMatchResult, scorePick, previewPickPoints, summarizePicks } from './scoring'
+import { getMatchResult, scorePick, scoreAllPicksForMatch, previewPickPoints, summarizePicks } from './scoring'
 
 describe('getMatchResult', () => {
   it('detects home win, away win, and draw', () => {
@@ -60,5 +60,20 @@ describe('summarizePicks', () => {
       { points_earned: 15, pick_result: 'EXACT' },
       { points_earned: 5, pick_result: 'EXACT' },
     ])).toEqual({ total: 20, exact: 2, correct: 2, scored: 2 })
+  })
+})
+
+describe('scoreAllPicksForMatch', () => {
+  it('scores a batch of picks against one match result (flat 0/3/5)', () => {
+    const res = scoreAllPicksForMatch(
+      [
+        { home_score_pick: 2, away_score_pick: 1 }, // EXACT → 5
+        { home_score_pick: 0, away_score_pick: 0 }, // predicted DRAW, actual HOME → 0
+        { home_score_pick: 5, away_score_pick: 0 }, // HOME outcome, wrong score → 3
+      ],
+      { home_score: 2, away_score: 1 },
+    )
+    expect(res.map(r => r.points)).toEqual([5, 0, 3])
+    expect(res.map(r => r.result)).toEqual(['EXACT', 'WRONG', 'CORRECT'])
   })
 })
