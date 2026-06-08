@@ -59,7 +59,7 @@ export default function PicksClient({ userId, initialMatches }: Props) {
     return () => { supabase.removeChannel(channel) }
   }, [supabase])
 
-  async function handlePickSaved(matchId: string, { home, away, confidence }: PickPayload) {
+  async function handlePickSaved(matchId: string, { home, away }: PickPayload) {
     const winner = getMatchResult(home, away)
     const { error } = await supabase.from('picks').upsert(
       {
@@ -67,7 +67,6 @@ export default function PicksClient({ userId, initialMatches }: Props) {
         match_id: matchId,
         home_score_pick: home,
         away_score_pick: away,
-        confidence_multiplier: confidence,
         winner_pick: winner,
       },
       { onConflict: 'user_id,match_id' }
@@ -85,7 +84,7 @@ export default function PicksClient({ userId, initialMatches }: Props) {
                 match_id: matchId,
                 home_score_pick: home,
                 away_score_pick: away,
-                confidence_multiplier: confidence,
+                confidence_multiplier: 1,
                 winner_pick: winner,
                 points_earned: m.userPick?.points_earned ?? null,
                 pick_result: m.userPick?.pick_result ?? null,

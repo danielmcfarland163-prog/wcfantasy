@@ -2,14 +2,13 @@
 import { useState, type CSSProperties } from 'react'
 import { formatKickoff, isMatchLocked } from '@/lib/utils'
 import { previewPickPoints, getMatchResult } from '@/lib/scoring'
-import type { MatchWithPick, ConfidenceMultiplier, WinnerPick } from '@/lib/types'
+import type { MatchWithPick, WinnerPick } from '@/lib/types'
 import Flag, { isoForTeam } from '@/components/ui/Flag'
 import LiveDot from '@/components/ui/LiveDot'
 
 export interface PickPayload {
   home: number
   away: number
-  confidence: ConfidenceMultiplier
 }
 
 interface Props {
@@ -18,7 +17,6 @@ interface Props {
 }
 
 const MAX_GOALS = 20
-const CONFIDENCE_OPTS: ConfidenceMultiplier[] = [1, 2, 3]
 
 function clampGoals(n: number): number {
   if (Number.isNaN(n)) return 0
@@ -30,11 +28,9 @@ export default function MatchCard({ match, onPickSaved }: Props) {
 
   const savedHome = pick?.home_score_pick ?? null
   const savedAway = pick?.away_score_pick ?? null
-  const savedConf = (pick?.confidence_multiplier ?? 1) as ConfidenceMultiplier
 
   const [home, setHome] = useState<number | null>(savedHome)
   const [away, setAway] = useState<number | null>(savedAway)
-  const [confidence, setConfidence] = useState<ConfidenceMultiplier>(savedConf)
   const [saving, setSaving] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
   const [error, setError] = useState(false)
@@ -55,16 +51,16 @@ export default function MatchCard({ match, onPickSaved }: Props) {
       : null
 
   const bothSet = home !== null && away !== null
-  const dirty = home !== savedHome || away !== savedAway || confidence !== savedConf
+  const dirty = home !== savedHome || away !== savedAway
   const canSave = !locked && bothSet && dirty && !saving
-  const preview = bothSet ? previewPickPoints(home!, away!, confidence) : null
+  const preview = bothSet ? previewPickPoints(home!, away!) : null
 
   async function handleSave() {
     if (!canSave || !onPickSaved) return
     setSaving(true)
     setError(false)
     try {
-      await onPickSaved(match.id, { home: home!, away: away!, confidence })
+      await onPickSaved(match.id, { home: home!, away: away! })
       setJustSaved(true)
       setTimeout(() => setJustSaved(false), 2000)
     } catch {
@@ -148,42 +144,14 @@ export default function MatchCard({ match, onPickSaved }: Props) {
         </div>
       </div>
 
-      {/* OPEN: confidence selector + save */}
+      {/* OPEN: save */}
       {!locked && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0 10px' }}>
-            <span style={{ fontFamily: 'var(--f-mono)', fontSize: 9, letterSpacing: 0.5, color: 'var(--ink-3)', textTransform: 'uppercase', flexShrink: 0 }}>
-              Confidence
-            </span>
-            <div style={{ display: 'flex', gap: 6, flex: 1 }}>
-              {CONFIDENCE_OPTS.map(c => {
-                const on = confidence === c
-                return (
-                  <button
-                    key={c}
-                    onClick={() => setConfidence(c)}
-                    aria-pressed={on}
-                    style={{
-                      flex: 1, cursor: 'pointer', padding: '6px 4px', borderRadius: 9,
-                      border: on ? '1.5px solid var(--accent)' : '1.5px solid var(--line)',
-                      background: on ? 'color-mix(in srgb, var(--accent) 12%, var(--surface))' : 'var(--surface)',
-                      color: on ? 'var(--accent)' : 'var(--ink-3)',
-                      fontFamily: 'var(--f-body)', fontWeight: on ? 800 : 600, fontSize: 13,
-                      transition: 'all .12s',
-                    }}
-                  >
-                    {c}×
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
           <button
             onClick={handleSave}
             disabled={!canSave}
             style={{
-              width: '100%', padding: '10px 4px', borderRadius: 11, border: 'none',
+              width: '100%', marginTop: 12, padding: '10px 4px', borderRadius: 11, border: 'none',
               cursor: canSave ? 'pointer' : 'default',
               background: justSaved ? 'color-mix(in srgb, var(--win) 14%, var(--surface))'
                 : canSave ? 'var(--accent)' : 'var(--surface-2)',
@@ -198,7 +166,6 @@ export default function MatchCard({ match, onPickSaved }: Props) {
           {preview && (
             <div style={{ marginTop: 7, textAlign: 'center', fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--ink-3)', letterSpacing: 0.2 }}>
               +{preview.correctPts} correct&nbsp;·&nbsp;+{preview.exactPts} exact
-              {confidence > 1 && <span style={{ color: 'var(--accent)' }}>&nbsp;({confidence}× applied)</span>}
             </div>
           )}
 
@@ -221,11 +188,6 @@ export default function MatchCard({ match, onPickSaved }: Props) {
               <span style={{ fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 15, color: 'var(--ink)' }}>
                 {savedHome}–{savedAway}
               </span>
-              {savedConf > 1 && (
-                <span style={{ fontFamily: 'var(--f-mono)', fontSize: 10, fontWeight: 700, color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 10%, transparent)', borderRadius: 5, padding: '1px 5px' }}>
-                  {savedConf}×
-                </span>
-              )}
             </div>
           ) : (
             <div style={{ textAlign: 'center', fontFamily: 'var(--f-body)', fontSize: 12, color: 'var(--ink-3)' }}>

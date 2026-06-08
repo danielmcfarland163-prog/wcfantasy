@@ -9,42 +9,39 @@ describe('getMatchResult', () => {
   })
 })
 
-describe('scorePick (GDD §2.1: 0 / 3 / 5 × confidence)', () => {
+describe('scorePick (GDD §2.1: 0 / 3 / 5, no multiplier)', () => {
   const match = { home_score: 2, away_score: 1 } // HOME win
 
-  it('exact score = 5 × multiplier', () => {
-    expect(scorePick({ home_score_pick: 2, away_score_pick: 1, confidence_multiplier: 1 }, match))
+  it('exact score = 5', () => {
+    expect(scorePick({ home_score_pick: 2, away_score_pick: 1 }, match))
       .toEqual({ points: 5, result: 'EXACT' })
-    expect(scorePick({ home_score_pick: 2, away_score_pick: 1, confidence_multiplier: 3 }, match))
-      .toEqual({ points: 15, result: 'EXACT' })
   })
 
-  it('correct outcome but wrong score = 3 × multiplier', () => {
-    expect(scorePick({ home_score_pick: 3, away_score_pick: 0, confidence_multiplier: 1 }, match))
+  it('correct outcome but wrong score = 3', () => {
+    expect(scorePick({ home_score_pick: 3, away_score_pick: 0 }, match))
       .toEqual({ points: 3, result: 'CORRECT' })
-    expect(scorePick({ home_score_pick: 1, away_score_pick: 0, confidence_multiplier: 2 }, match))
-      .toEqual({ points: 6, result: 'CORRECT' })
+    expect(scorePick({ home_score_pick: 1, away_score_pick: 0 }, match))
+      .toEqual({ points: 3, result: 'CORRECT' })
   })
 
-  it('wrong outcome = 0 regardless of multiplier', () => {
-    expect(scorePick({ home_score_pick: 0, away_score_pick: 2, confidence_multiplier: 3 }, match))
+  it('wrong outcome = 0', () => {
+    expect(scorePick({ home_score_pick: 0, away_score_pick: 2 }, match))
       .toEqual({ points: 0, result: 'WRONG' })
   })
 
   it('handles draws (exact vs correct-outcome)', () => {
     const draw = { home_score: 1, away_score: 1 }
-    expect(scorePick({ home_score_pick: 1, away_score_pick: 1, confidence_multiplier: 1 }, draw))
+    expect(scorePick({ home_score_pick: 1, away_score_pick: 1 }, draw))
       .toEqual({ points: 5, result: 'EXACT' })
-    expect(scorePick({ home_score_pick: 2, away_score_pick: 2, confidence_multiplier: 1 }, draw))
+    expect(scorePick({ home_score_pick: 2, away_score_pick: 2 }, draw))
       .toEqual({ points: 3, result: 'CORRECT' })
   })
 })
 
 describe('previewPickPoints', () => {
-  it('scales both tiers by the multiplier', () => {
-    expect(previewPickPoints(1, 0, 1)).toEqual({ correctPts: 3, exactPts: 5 })
-    expect(previewPickPoints(1, 0, 2)).toEqual({ correctPts: 6, exactPts: 10 })
-    expect(previewPickPoints(1, 0, 3)).toEqual({ correctPts: 9, exactPts: 15 })
+  it('returns the flat correct / exact tiers', () => {
+    expect(previewPickPoints(1, 0)).toEqual({ correctPts: 3, exactPts: 5 })
+    expect(previewPickPoints(3, 2)).toEqual({ correctPts: 3, exactPts: 5 })
   })
 })
 

@@ -19,7 +19,7 @@ export function getMatchResult(homeScore: number, awayScore: number): MatchResul
 }
 
 export function scorePick(
-  pick: { home_score_pick: number; away_score_pick: number; confidence_multiplier: number },
+  pick: { home_score_pick: number; away_score_pick: number },
   match: { home_score: number; away_score: number },
   config: ScoringConfig = DEFAULT_CONFIG
 ): { points: number; result: 'EXACT' | 'CORRECT' | 'WRONG' } {
@@ -31,13 +31,11 @@ export function scorePick(
     pick.away_score_pick === match.away_score
 
   if (isExact) {
-    const pts = (config.correct_result_pts + config.exact_score_bonus) * pick.confidence_multiplier
-    return { points: pts, result: 'EXACT' }
+    return { points: config.correct_result_pts + config.exact_score_bonus, result: 'EXACT' }
   }
 
   if (actualResult === pickedResult) {
-    const pts = config.correct_result_pts * pick.confidence_multiplier
-    return { points: pts, result: 'CORRECT' }
+    return { points: config.correct_result_pts, result: 'CORRECT' }
   }
 
   return { points: 0, result: 'WRONG' }
@@ -45,7 +43,7 @@ export function scorePick(
 
 // Used server-side to bulk score all picks for a finished match
 export function scoreAllPicksForMatch(
-  picks: Array<{ home_score_pick: number; away_score_pick: number; confidence_multiplier: number }>,
+  picks: Array<{ home_score_pick: number; away_score_pick: number }>,
   match: { home_score: number; away_score: number },
   config: ScoringConfig = DEFAULT_CONFIG
 ) {
@@ -56,11 +54,10 @@ export function scoreAllPicksForMatch(
 export function previewPickPoints(
   homeScorePick: number,
   awayScorePick: number,
-  multiplier: number = 1,
   config: ScoringConfig = DEFAULT_CONFIG
 ) {
-  const correctPts = config.correct_result_pts * multiplier
-  const exactPts = (config.correct_result_pts + config.exact_score_bonus) * multiplier
+  const correctPts = config.correct_result_pts
+  const exactPts = config.correct_result_pts + config.exact_score_bonus
   return { correctPts, exactPts }
 }
 

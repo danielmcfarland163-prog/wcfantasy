@@ -1,22 +1,27 @@
 'use client'
 
-import { useState, useCallback, useRef, useMemo } from 'react'
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import Flag, { isoForTeam } from '@/components/ui/Flag'
 import LockCountdown from '@/components/LockCountdown'
 import {
-  GROUPS, GROUP_KEYS, BracketState,
-  teamByName, getMatchTeams, setPick,
+  GROUPS, GROUP_KEYS, BracketState, type BracketMode,
+  teamByName, getModeMatchTeams, setPick,
   pickGroup, pickThird, thirdCandidates,
-  groupsComplete, thirdComplete, isLocked, stateToDb,
-  TOURNAMENT_LOCK,
+  groupsComplete, thirdComplete, stateToDb,
+  bracketModeOpen, isBracketModeLocked, reconcileKnockout,
+  isGroupLocked,
+  TOURNAMENT_LOCK, KNOCKOUT_LOCK,
 } from '@/lib/bracket'
 import { scoreBracketEntry, BRACKET_PTS } from '@/lib/bracket-scoring'
 
-const LOCK_LABEL = TOURNAMENT_LOCK.toLocaleString('en-GB', {
-  weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  timeZone: 'UTC', hour12: false,
-}) + ' UTC'
+const fmtLock = (d: Date) =>
+  d.toLocaleString('en-GB', {
+    weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    timeZone: 'UTC', hour12: false,
+  }) + ' UTC'
+const LOCK_LABEL = fmtLock(TOURNAMENT_LOCK)
+const KO_LOCK_LABEL = fmtLock(KNOCKOUT_LOCK)
 
 type Tab = 'groups' | 'third' | 'bracket' | 'standings' | 'summary'
 interface TournamentResults {
@@ -29,7 +34,7 @@ interface TournamentResults {
   final_result: string | null
 }
 
-interface Props { userId: string; initialState: BracketState; tournamentResults?: TournamentResults | null }
+interface Props { userId: string; mode: BracketMode; initialState: BracketState; tournamentResults?: TournamentResults | null }
 
 const GC: Record<string, string> = {
   A:'#2f6fe0',B:'#1f9d5a',C:'#e03c2c',D:'#c98a1a',
@@ -37,14 +42,25 @@ const GC: Record<string, string> = {
   I:'#d97706',J:'#4f46e5',K:'#dc2626',L:'#0d9488',
 }
 
-export default function BracketClient({ userId, initialState, tournamentResults }: Props) {
+export default function BracketClient({ userId, mode, initialState, tournamentResults }: Props) {
   // Stable client — created once, not on every render
   const supabase = useMemo(() => createClient(), [])
   const [state, setState] = useState<BracketState>(initialState)
-  const locked = isLocked()
-  // Land on Summary when the tournament is in progress and results exist
+  const isPickem = mode === 'pickem'
+  const groupLocked = isGroupLocked()
+  // Mode-aware. pickem: the knockout is seeded from the player's OWN groups and
+  // everything locks at the group lock. reset: the knockout opens from the real
+  // results and locks at the knockout lock.
+  const bracketOpen = bracketModeOpen(mode, state, tournamentResults)
+  const bracketLocked = isBracketModeLocked(mode)
+  const bracketLockLabel = isPickem ? LOCK_LABEL : KO_LOCK_LABEL
   const hasResults = !!(tournamentResults && Object.keys(tournamentResults.group_results ?? {}).length > 0)
-  const [tab, setTab] = useState<Tab>(locked && hasResults ? 'summary' : 'groups')
+  // Landing tab: bracket open & editable → Bracket; locked with results → Summary; else Groups.
+  const [tab, setTab] = useState<Tab>(
+    bracketOpen && !bracketLocked ? 'bracket'
+    : groupLocked && hasResults ? 'summary'
+    : 'groups',
+  )
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -57,8 +73,8 @@ export default function BracketClient({ userId, initialState, tournamentResults 
       const { error } = await supabase
         .from('bracket_entries')
         .upsert(
-          { user_id: userId, ...stateToDb(s), updated_at: new Date().toISOString() },
-          { onConflict: 'user_id' }
+          { user_id: userId, mode, ...stateToDb(s), updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,mode' }
         )
       setSaving(false)
       if (error) {
@@ -72,11 +88,22 @@ export default function BracketClient({ userId, initialState, tournamentResults 
         }
       }
     }, 600)
-  }, [userId, supabase])
+  }, [userId, mode, supabase])
 
   function update(s: BracketState) { setState(s); save(s) }
-  function updateAndNavigate(s: BracketState, nextTab: Tab) { setState(s); save(s); setTab(nextTab) }
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 2500) }
+
+  // Reset mode only: when the knockout opens, prune any stored knockout picks that
+  // aren't real participants of the actual R32 (legacy picks seeded off the user's
+  // own predicted groups). Pickem keeps its self-seeded picks as-is. Runs once.
+  const reconciledRef = useRef(false)
+  useEffect(() => {
+    if (reconciledRef.current || mode !== 'reset' || !bracketOpen || bracketLocked) return
+    reconciledRef.current = true
+    const next = reconcileKnockout(state, tournamentResults)
+    if (JSON.stringify(next) !== JSON.stringify(state)) update(next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bracketOpen, bracketLocked])
 
   const groupsDone  = groupsComplete(state)
   const thirdDone   = thirdComplete(state)
@@ -84,23 +111,65 @@ export default function BracketClient({ userId, initialState, tournamentResults 
   const doneCount   = GROUP_KEYS.filter(gk => state.gp[gk]?.first && state.gp[gk]?.second).length
   const bracketPicks = [...state.r32, ...state.r16, ...state.qf, ...state.sf, state.final].filter(Boolean).length
 
+  const bracketBadge = !bracketOpen ? '🔒'
+    : bracketDone ? '✓'
+    : bracketPicks > 0 ? `${bracketPicks}/31` : undefined
+
   const tabs: { key: Tab; label: string; disabled?: boolean; badge?: string }[] = [
     { key: 'groups',   label: 'Groups',    badge: groupsDone ? '✓' : `${doneCount}/12` },
     { key: 'third',    label: '3rd Place', badge: thirdDone ? '✓' : `${state.tq.length}/8`, disabled: !groupsDone },
-    { key: 'bracket',  label: 'Bracket',   badge: bracketDone ? '✓' : bracketPicks > 0 ? `${bracketPicks}/31` : undefined, disabled: !groupsDone },
+    { key: 'bracket',  label: 'Bracket',   badge: bracketBadge },
     ...(hasResults ? [{ key: 'standings' as Tab, label: 'Standings' }] : []),
     { key: 'summary',  label: 'Summary' },
   ]
 
+  // Mode-aware banner.
+  const banner = (() => {
+    if (isPickem) {
+      // Up-front pick'em: one lock at the group lock (first kickoff).
+      if (bracketLocked) {
+        return (
+          <div style={{ margin:'0 0 16px', padding:'10px 14px', background:'color-mix(in srgb,var(--gold) 10%,var(--surface))', border:'1px solid color-mix(in srgb,var(--gold) 30%,var(--line))', borderRadius:12, fontFamily:'var(--f-mono)', fontSize:11, color:'var(--gold)', fontWeight:700 }}>
+            🔒 Pick’em bracket locked — tournament in progress. Read-only.
+          </div>
+        )
+      }
+      return <LockCountdown />
+    }
+    // Reset: group countdown → group-locked notice → knockout notice → fully-locked.
+    if (bracketLocked) {
+      return (
+        <div style={{ margin:'0 0 16px', padding:'10px 14px', background:'color-mix(in srgb,var(--gold) 10%,var(--surface))', border:'1px solid color-mix(in srgb,var(--gold) 30%,var(--line))', borderRadius:12, fontFamily:'var(--f-mono)', fontSize:11, color:'var(--gold)', fontWeight:700 }}>
+          🔒 Bracket locked — knockout stage underway. Read-only.
+        </div>
+      )
+    }
+    if (bracketOpen) {
+      return (
+        <div style={{ margin:'0 0 16px', padding:'12px 16px', background:'linear-gradient(135deg,color-mix(in srgb,var(--accent) 12%,var(--surface)),color-mix(in srgb,var(--accent) 4%,var(--surface)))', border:'1.5px solid color-mix(in srgb,var(--accent) 32%,var(--line))', borderRadius:14 }}>
+          <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:15, color:'var(--ink)' }}>⚽ Group stage complete — fill your knockout bracket</div>
+          <div style={{ fontFamily:'var(--f-body)', fontSize:12.5, color:'var(--ink-2)', marginTop:2 }}>
+            The Round of 32 is set from the real results. Pick your winners through to the final — locks <strong style={{ color:'var(--ink)' }}>{KO_LOCK_LABEL}</strong>.
+          </div>
+        </div>
+      )
+    }
+    if (groupLocked) {
+      return (
+        <div style={{ margin:'0 0 16px', padding:'12px 16px', background:'color-mix(in srgb,var(--gold) 9%,var(--surface))', border:'1px solid color-mix(in srgb,var(--gold) 28%,var(--line))', borderRadius:14 }}>
+          <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:15, color:'var(--ink)' }}>🔒 Group picks locked — group stage in progress</div>
+          <div style={{ fontFamily:'var(--f-body)', fontSize:12.5, color:'var(--ink-2)', marginTop:2 }}>
+            Your knockout bracket opens here once the group stage finishes and the Round of 32 is set.
+          </div>
+        </div>
+      )
+    }
+    return <LockCountdown />
+  })()
+
   return (
     <div>
-      {locked ? (
-        <div style={{ margin:'0 0 16px', padding:'10px 14px', background:'color-mix(in srgb,var(--gold) 10%,var(--surface))', border:'1px solid color-mix(in srgb,var(--gold) 30%,var(--line))', borderRadius:12, fontFamily:'var(--f-mono)', fontSize:11, color:'var(--gold)', fontWeight:700 }}>
-          🔒 Picks locked — tournament in progress. Read-only.
-        </div>
-      ) : (
-        <LockCountdown />
-      )}
+      {banner}
       {saving && (
         <div style={{ position:'fixed', top:16, right:16, zIndex:50, background:'var(--win)', color:'#fff', fontSize:11, fontFamily:'var(--f-mono)', fontWeight:700, padding:'5px 12px', borderRadius:20, boxShadow:'0 4px 12px rgba(31,157,90,0.4)' }}>
           Saving…
@@ -123,11 +192,11 @@ export default function BracketClient({ userId, initialState, tournamentResults 
         ))}
       </div>
 
-      {tab==='groups'  && <GroupsTab  state={state} locked={locked} onUpdate={update} onNext={() => setTab('third')} results={tournamentResults} />}
-      {tab==='third'   && <ThirdTab   state={state} locked={locked} onUpdate={update} onNext={() => setTab('bracket')} onToast={showToast} results={tournamentResults} />}
-      {tab==='bracket'  && <BracketTab state={state} locked={locked} onUpdate={update} onComplete={() => setTab('summary')} results={tournamentResults} />}
+      {tab==='groups'  && <GroupsTab  state={state} locked={groupLocked} onUpdate={update} onNext={() => setTab('third')} results={tournamentResults} />}
+      {tab==='third'   && <ThirdTab   state={state} locked={groupLocked} onUpdate={update} onNext={() => setTab(bracketOpen ? 'bracket' : 'summary')} onToast={showToast} results={tournamentResults} />}
+      {tab==='bracket'  && <BracketTab state={state} mode={mode} locked={bracketLocked} bracketOpen={bracketOpen} onUpdate={update} onComplete={() => setTab('summary')} results={tournamentResults} />}
       {tab==='standings' && <StandingsTab results={tournamentResults ?? null} />}
-      {tab==='summary'  && <SummaryTab state={state} onGoTo={setTab} results={tournamentResults ?? null} locked={locked} submitted={submitted} onSubmit={() => { setSubmitted(true); showToast('Bracket locked in — editable until kickoff') }} />}
+      {tab==='summary'  && <SummaryTab state={state} mode={mode} onGoTo={setTab} results={tournamentResults ?? null} groupLocked={groupLocked} bracketLocked={bracketLocked} bracketOpen={bracketOpen} bracketLockLabel={bracketLockLabel} submitted={submitted} onSubmit={() => { setSubmitted(true); showToast(isPickem ? 'Bracket locked in — editable until kickoff' : 'Knockout bracket locked in — editable until kickoff') }} />}
 
       {toast && (
         <div style={{ position:'fixed', bottom:80, left:'50%', transform:'translateX(-50%)', background:'var(--ink)', color:'#fff', fontSize:13, fontFamily:'var(--f-body)', padding:'8px 20px', borderRadius:24, boxShadow:'0 8px 24px rgba(0,0,0,0.25)', zIndex:50, whiteSpace:'nowrap' }}>
@@ -310,7 +379,7 @@ function ThirdTab({ state, locked, onUpdate, onNext, onToast, results }: { state
 
       {done && (
         <button onClick={onNext} className="btn-primary" style={{ width:'100%', marginTop:24, padding:'14px', fontSize:15 }}>
-          Next: Fill in Bracket →
+          Done — review my picks →
         </button>
       )}
       <style>{`@media(min-width:600px){.bc-grid{grid-template-columns:repeat(2,1fr)!important}}@media(min-width:960px){.bc-grid{grid-template-columns:repeat(3,1fr)!important}}`}</style>
@@ -345,14 +414,19 @@ function getActuals(results: TournamentResults | null | undefined, rKey: string)
   return []
 }
 
-function BracketTab({ state, locked, onUpdate, onComplete, results }: { state:BracketState; locked:boolean; onUpdate:(s:BracketState)=>void; onComplete:()=>void; results?: TournamentResults | null }) {
-  if (!groupsComplete(state)) {
+function BracketTab({ state, mode, locked, bracketOpen, onUpdate, onComplete, results }: { state:BracketState; mode:BracketMode; locked:boolean; bracketOpen:boolean; onUpdate:(s:BracketState)=>void; onComplete:()=>void; results?: TournamentResults | null }) {
+  const isPickem = mode === 'pickem'
+  if (!bracketOpen) {
     return (
       <div style={{ padding:'48px 24px', textAlign:'center', background:'var(--surface)', border:'1px solid var(--line)', borderRadius:20 }}>
-        <div style={{ fontSize:40, marginBottom:12 }}>🗂</div>
-        <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:20, color:'var(--ink)', marginBottom:8 }}>Complete Group Picks First</div>
-        <p style={{ fontFamily:'var(--f-body)', fontSize:14, color:'var(--ink-2)', maxWidth:320, margin:'0 auto' }}>
-          Pick 1st and 2nd from all 12 groups to populate the knockout bracket.
+        <div style={{ fontSize:40, marginBottom:12 }}>{isPickem ? '🗂' : '🔒'}</div>
+        <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:20, color:'var(--ink)', marginBottom:8 }}>
+          {isPickem ? 'Complete your group picks first' : 'Knockout bracket opens after the group stage'}
+        </div>
+        <p style={{ fontFamily:'var(--f-body)', fontSize:14, color:'var(--ink-2)', maxWidth:340, margin:'0 auto' }}>
+          {isPickem
+            ? 'Pick 1st and 2nd from all 12 groups to populate your knockout bracket from your own predicted standings.'
+            : 'Once all 12 groups finish and the Round of 32 is set, the real bracket unlocks here and everyone picks their knockout winners through to the final.'}
         </p>
       </div>
     )
@@ -361,7 +435,9 @@ function BracketTab({ state, locked, onUpdate, onComplete, results }: { state:Br
   return (
     <div>
       <p style={{ fontFamily:'var(--f-body)', fontSize:12, color:'var(--ink-3)', marginBottom:16 }}>
-        Click a team to advance them. Changes cascade — altering an earlier round clears downstream picks.
+        {isPickem
+          ? 'Your Round of 32 is seeded from your own group picks. Click a team to advance them — changes cascade, so altering an earlier round clears downstream picks.'
+          : 'The Round of 32 is seeded from the actual group results. Click a team to advance them — changes cascade, so altering an earlier round clears downstream picks.'}
       </p>
 
       <div style={{ overflowX:'auto', marginBottom:24, borderRadius:16, border:'1px solid var(--line)', background:'var(--surface)' }} className="wc-noscroll">
@@ -375,7 +451,7 @@ function BracketTab({ state, locked, onUpdate, onComplete, results }: { state:Br
                 </div>
                 <div style={{ flex:1, display:'flex', flexDirection:'column', justifyContent:'space-around', padding:'8px 5px' }}>
                   {Array.from({ length:n }).map((_, i) => {
-                    const { h, a } = getMatchTeams(state, rKey, i)
+                    const { h, a } = getModeMatchTeams(mode, state, results, rKey, i)
                     const pick = picks[i] ?? null
                     const actuals = getActuals(results, rKey)
                     return (
@@ -486,13 +562,14 @@ function ResultBadge({ pick, actual }: { pick: string | null | undefined; actual
   )
 }
 
-function SummaryTab({ state, onGoTo, results, locked, submitted, onSubmit }: { state:BracketState; onGoTo:(t:Tab)=>void; results: TournamentResults | null; locked:boolean; submitted:boolean; onSubmit:()=>void }) {
+function SummaryTab({ state, mode, onGoTo, results, groupLocked, bracketLocked, bracketOpen, bracketLockLabel, submitted, onSubmit }: { state:BracketState; mode:BracketMode; onGoTo:(t:Tab)=>void; results: TournamentResults | null; groupLocked:boolean; bracketLocked:boolean; bracketOpen:boolean; bracketLockLabel:string; submitted:boolean; onSubmit:()=>void }) {
   const groupsDone = groupsComplete(state)
   const thirdDone  = thirdComplete(state)
+  const groupPhaseDone = groupsDone && thirdDone
+  const knockoutDone = !!state.final
   const bracketPicks = [...state.r32,...state.r16,...state.qf,...state.sf,state.final].filter(Boolean).length
   const doneCount = GROUP_KEYS.filter(gk => state.gp[gk]?.first && state.gp[gk]?.second).length
   const hasResults = !!results
-  const allComplete = groupsDone && thirdDone && !!state.final
 
   // Shared scoring engine — identical to the server (lib/bracket-scoring.ts)
   const score = results ? scoreBracketEntry(stateToDb(state), results) : null
@@ -510,43 +587,84 @@ function SummaryTab({ state, onGoTo, results, locked, submitted, onSubmit }: { s
   const sfCorrect   = results ? state.sf.filter((p,i)  => p && p === results.sf_results[i]).length  : 0
   const champCorrect = results && state.final && state.final === results.final_result ? 1 : 0
 
-  const completeSections = [groupsDone, thirdDone, !!state.final].filter(Boolean).length
+  const isPickem = mode === 'pickem'
+  const firstIncompleteGroup: Tab = !groupsDone ? 'groups' : 'third'
+  const groupSectionsDone = [groupsDone, thirdDone].filter(Boolean).length
   const firstIncomplete: Tab = !groupsDone ? 'groups' : !thirdDone ? 'third' : 'bracket'
+  const completeSections = [groupsDone, thirdDone, knockoutDone].filter(Boolean).length
+  const allComplete = groupPhaseDone && knockoutDone
+
+  // Reusable card styles.
+  const lockedInCard = (title: string) => (
+    <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 18px', borderRadius:16, background:'linear-gradient(135deg,color-mix(in srgb,var(--win) 14%,var(--surface)),color-mix(in srgb,var(--win) 5%,var(--surface)))', border:'1.5px solid color-mix(in srgb,var(--win) 38%,var(--line))' }}>
+      <span style={{ width:32, height:32, borderRadius:'50%', background:'var(--win)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, fontWeight:800, flexShrink:0 }}>✓</span>
+      <div>
+        <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:17, color:'var(--ink)' }}>{title}</div>
+        <div style={{ fontFamily:'var(--f-body)', fontSize:12.5, color:'var(--ink-2)', marginTop:1 }}>Saved automatically. You can still edit until <strong style={{ color:'var(--ink)' }}>{bracketLockLabel}</strong>.</div>
+      </div>
+    </div>
+  )
+  const completeCard = (title: string) => (
+    <div style={{ padding:'18px', borderRadius:16, background:'linear-gradient(135deg,color-mix(in srgb,var(--accent) 12%,var(--surface)),color-mix(in srgb,var(--accent) 4%,var(--surface)))', border:'1.5px solid color-mix(in srgb,var(--accent) 32%,var(--line))', textAlign:'center' }}>
+      <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:19, color:'var(--ink)', marginBottom:4 }}>{title}</div>
+      <div style={{ fontFamily:'var(--f-body)', fontSize:13, color:'var(--ink-2)', marginBottom:14, maxWidth:340, marginInline:'auto' }}>All 31 picks are in. Lock it in to confirm — you can still tweak picks until {bracketLockLabel}.</div>
+      <button onClick={onSubmit} className="btn-primary" style={{ padding:'12px 28px', fontSize:15, fontWeight:700 }}>✓ Lock in my bracket</button>
+    </div>
+  )
+  const finishButton = (target: Tab, title: string, sub: string, badge: string) => (
+    <button onClick={() => onGoTo(target)}
+      style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 18px', borderRadius:16, background:'var(--surface)', border:'1px dashed color-mix(in srgb,var(--accent) 40%,var(--line))', cursor:'pointer', textAlign:'left', width:'100%' }}>
+      <span style={{ width:32, height:32, borderRadius:'50%', background:'color-mix(in srgb,var(--accent) 14%,transparent)', color:'var(--accent)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, fontWeight:800, flexShrink:0 }}>→</span>
+      <div style={{ flex:1 }}>
+        <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:16, color:'var(--ink)' }}>{title}</div>
+        <div style={{ fontFamily:'var(--f-body)', fontSize:12.5, color:'var(--ink-2)', marginTop:1 }}>{sub}</div>
+      </div>
+      <span style={{ fontFamily:'var(--f-mono)', fontSize:11, fontWeight:700, color:'var(--accent)' }}>{badge}</span>
+    </button>
+  )
+
+  // Mode-aware "submit / completeness" affordance.
+  const submitSection = (() => {
+    if (bracketLocked) return null // read-only after this mode's lock
+
+    // PICK'EM — fill the whole bracket up front; single lock.
+    if (isPickem) {
+      if (allComplete) {
+        return submitted ? lockedInCard('Bracket locked in') : completeCard('🎉 Your bracket is complete')
+      }
+      return finishButton(firstIncomplete, 'Finish your bracket', `${completeSections} of 3 stages complete · groups, 3rd place, knockout`, `${completeSections}/3`)
+    }
+
+    // RESET — phased.
+    if (bracketOpen) {
+      if (!knockoutDone) {
+        return finishButton('bracket', 'Finish your knockout bracket', `${bracketPicks} of 31 picks in · pick through to the final`, `${bracketPicks}/31`)
+      }
+      return submitted ? lockedInCard('Knockout bracket locked in') : completeCard('🎉 Your knockout bracket is complete')
+    }
+    if (!groupLocked) {
+      return groupPhaseDone ? (
+        <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 18px', borderRadius:16, background:'linear-gradient(135deg,color-mix(in srgb,var(--win) 14%,var(--surface)),color-mix(in srgb,var(--win) 5%,var(--surface)))', border:'1.5px solid color-mix(in srgb,var(--win) 38%,var(--line))' }}>
+          <span style={{ width:32, height:32, borderRadius:'50%', background:'var(--win)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, fontWeight:800, flexShrink:0 }}>✓</span>
+          <div>
+            <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:17, color:'var(--ink)' }}>Group picks complete</div>
+            <div style={{ fontFamily:'var(--f-body)', fontSize:12.5, color:'var(--ink-2)', marginTop:1 }}>Editable until <strong style={{ color:'var(--ink)' }}>{LOCK_LABEL}</strong>. Your knockout bracket opens after the group stage.</div>
+          </div>
+        </div>
+      ) : finishButton(firstIncompleteGroup, 'Finish your group picks', '1st/2nd in all 12 groups + your 8 third-place qualifiers', `${groupSectionsDone}/2`)
+    }
+    // Between phases — group locked, knockout not yet open.
+    return (
+      <div style={{ padding:'14px 18px', borderRadius:16, background:'color-mix(in srgb,var(--gold) 9%,var(--surface))', border:'1px solid color-mix(in srgb,var(--gold) 28%,var(--line))' }}>
+        <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:16, color:'var(--ink)' }}>🔒 Group picks locked</div>
+        <div style={{ fontFamily:'var(--f-body)', fontSize:12.5, color:'var(--ink-2)', marginTop:2 }}>Your knockout bracket opens here once the group stage finishes.</div>
+      </div>
+    )
+  })()
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-      {/* Submit / completeness — hidden once the tournament locks */}
-      {!locked && (
-        allComplete ? (
-          submitted ? (
-            <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 18px', borderRadius:16, background:'linear-gradient(135deg,color-mix(in srgb,var(--win) 14%,var(--surface)),color-mix(in srgb,var(--win) 5%,var(--surface)))', border:'1.5px solid color-mix(in srgb,var(--win) 38%,var(--line))' }}>
-              <span style={{ width:32, height:32, borderRadius:'50%', background:'var(--win)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, fontWeight:800, flexShrink:0 }}>✓</span>
-              <div>
-                <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:17, color:'var(--ink)' }}>Bracket locked in</div>
-                <div style={{ fontFamily:'var(--f-body)', fontSize:12.5, color:'var(--ink-2)', marginTop:1 }}>Saved automatically. You can still edit until <strong style={{ color:'var(--ink)' }}>{LOCK_LABEL}</strong>.</div>
-              </div>
-            </div>
-          ) : (
-            <div style={{ padding:'18px', borderRadius:16, background:'linear-gradient(135deg,color-mix(in srgb,var(--accent) 12%,var(--surface)),color-mix(in srgb,var(--accent) 4%,var(--surface)))', border:'1.5px solid color-mix(in srgb,var(--accent) 32%,var(--line))', textAlign:'center' }}>
-              <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:19, color:'var(--ink)', marginBottom:4 }}>🎉 Your bracket is complete</div>
-              <div style={{ fontFamily:'var(--f-body)', fontSize:13, color:'var(--ink-2)', marginBottom:14, maxWidth:340, marginInline:'auto' }}>All 31 picks are in. Lock it in to confirm — you can still tweak picks until {LOCK_LABEL}.</div>
-              <button onClick={onSubmit} className="btn-primary" style={{ padding:'12px 28px', fontSize:15, fontWeight:700 }}>
-                ✓ Lock in my bracket
-              </button>
-            </div>
-          )
-        ) : (
-          <button onClick={() => onGoTo(firstIncomplete)}
-            style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 18px', borderRadius:16, background:'var(--surface)', border:'1px dashed color-mix(in srgb,var(--accent) 40%,var(--line))', cursor:'pointer', textAlign:'left', width:'100%' }}>
-            <span style={{ width:32, height:32, borderRadius:'50%', background:'color-mix(in srgb,var(--accent) 14%,transparent)', color:'var(--accent)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, fontWeight:800, flexShrink:0 }}>→</span>
-            <div style={{ flex:1 }}>
-              <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:16, color:'var(--ink)' }}>Finish your bracket</div>
-              <div style={{ fontFamily:'var(--f-body)', fontSize:12.5, color:'var(--ink-2)', marginTop:1 }}>{completeSections} of 3 stages complete · continue where you left off</div>
-            </div>
-            <span style={{ fontFamily:'var(--f-mono)', fontSize:11, fontWeight:700, color:'var(--accent)' }}>{completeSections}/3</span>
-          </button>
-        )
-      )}
+      {submitSection}
 
       {/* Points breakdown — once results start coming in */}
       {score && (

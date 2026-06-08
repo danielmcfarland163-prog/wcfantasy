@@ -83,14 +83,183 @@ export const FLOW = {
   sf:  [[0,1],[2,3]],
 }
 
-// Tournament lock time — picks freeze when the first match kicks off.
-// Configurable via NEXT_PUBLIC_BRACKET_LOCK (ISO 8601, UTC); defaults to the
-// tournament opener. NEXT_PUBLIC_ so both server and client read the same value.
-const LOCK_ISO = process.env.NEXT_PUBLIC_BRACKET_LOCK || '2026-06-11T15:00:00Z'
-export const TOURNAMENT_LOCK = new Date(LOCK_ISO)
+// ── PHASED LOCKS ──────────────────────────────────────────────────────────────
+// The bracket is filled in two phases:
+//   Phase 1 — GROUP picks (1st/2nd + 3rd-place qualifiers). Freeze at the first
+//             match kickoff (the group lock).
+//   Phase 2 — KNOCKOUT bracket. Opens once the real group stage is over (results
+//             known) and freezes when the Round of 32 kicks off (the knockout lock).
+// Both are configurable via NEXT_PUBLIC_* env vars (ISO 8601, UTC) so server and
+// client read the same value; defaults track the real 2026 schedule.
 
+const GROUP_LOCK_ISO = process.env.NEXT_PUBLIC_BRACKET_LOCK || '2026-06-11T15:00:00Z'
+// TOURNAMENT_LOCK is kept as the name for the GROUP-phase lock (back-compat).
+export const TOURNAMENT_LOCK = new Date(GROUP_LOCK_ISO)
+export const GROUP_LOCK = TOURNAMENT_LOCK
+
+const KNOCKOUT_LOCK_ISO = process.env.NEXT_PUBLIC_KNOCKOUT_LOCK || '2026-06-28T19:00:00Z'
+export const KNOCKOUT_LOCK = new Date(KNOCKOUT_LOCK_ISO)
+
+// Back-compat: isLocked() === the group-phase lock.
 export function isLocked(): boolean {
-  return new Date() >= TOURNAMENT_LOCK
+  return new Date() >= GROUP_LOCK
+}
+export function isGroupLocked(): boolean {
+  return new Date() >= GROUP_LOCK
+}
+export function isKnockoutLocked(): boolean {
+  return new Date() >= KNOCKOUT_LOCK
+}
+
+// Loose shape of tournament_results that the phased helpers need.
+export interface BracketResults {
+  group_results?: Record<string, { first: string | null; second: string | null; third: string | null }> | null
+  third_quals?: (string | null)[] | null
+  r32_results?: (string | null)[] | null
+  r16_results?: (string | null)[] | null
+  qf_results?: (string | null)[] | null
+  sf_results?: (string | null)[] | null
+  final_result?: string | null
+}
+
+// The group stage is "over" (and the knockout bracket can open) once every group
+// has a 1st & 2nd and the 8 third-place qualifiers are known — i.e. the actual
+// Round of 32 field is fully determined.
+export function groupResultsComplete(results?: BracketResults | null): boolean {
+  if (!results) return false
+  const gr = results.group_results ?? {}
+  const allGroups = GROUP_KEYS.every((gk) => gr[gk]?.first && gr[gk]?.second)
+  const thirdsKnown = (results.third_quals ?? []).filter(Boolean).length >= 8
+  return allGroups && thirdsKnown
+}
+
+// The 16 actual R32 fixtures, seeded from real results. Slot order mirrors
+// R32_FIXTURES (and derive-results' r32Pairs), so indices line up with both the
+// user's r32 picks and tournament_results.r32_results.
+export function knockoutFixturesFromResults(
+  results?: BracketResults | null,
+): { h: BracketTeam | null; a: BracketTeam | null }[] {
+  const gr = results?.group_results ?? {}
+  const tq = results?.third_quals ?? []
+  const g = (k: string, slot: 'first' | 'second') => gr[k]?.[slot] ?? null
+  const pairs: [string | null, string | null][] = [
+    [g('A', 'first'), g('B', 'second')], [g('B', 'first'), g('A', 'second')],
+    [g('C', 'first'), g('D', 'second')], [g('D', 'first'), g('C', 'second')],
+    [g('E', 'first'), g('F', 'second')], [g('F', 'first'), g('E', 'second')],
+    [g('G', 'first'), g('H', 'second')], [g('H', 'first'), g('G', 'second')],
+    [g('I', 'first'), g('J', 'second')], [g('J', 'first'), g('I', 'second')],
+    [g('K', 'first'), g('L', 'second')], [g('L', 'first'), g('K', 'second')],
+    [tq[0] ?? null, tq[7] ?? null], [tq[1] ?? null, tq[6] ?? null],
+    [tq[2] ?? null, tq[5] ?? null], [tq[3] ?? null, tq[4] ?? null],
+  ]
+  return pairs.map(([a, b]) => ({
+    h: a ? teamByName(a) : null,
+    a: b ? teamByName(b) : null,
+  }))
+}
+
+// Match participants for the KNOCKOUT phase. The R32 base layer comes from the
+// ACTUAL results (everyone fills the same real bracket); R16→Final flow from the
+// user's own winner picks exactly as before.
+export function getKnockoutMatchTeams(
+  state: BracketState,
+  results: BracketResults | null | undefined,
+  round: string,
+  i: number,
+): { h: BracketTeam | null; a: BracketTeam | null } {
+  if (round === 'r32') return knockoutFixturesFromResults(results)[i] ?? { h: null, a: null }
+  return getMatchTeams(state, round, i)
+}
+
+// When the knockout phase opens, a user's stored knockout picks may reference
+// teams that didn't actually qualify (their old picks were seeded off their own
+// predicted groups). Drop any pick that isn't a real participant of its slot, and
+// cascade-clear downstream rounds that are no longer reachable. Non-destructive
+// for valid picks; returns the cleaned state.
+export function reconcileKnockout(
+  state: BracketState,
+  results: BracketResults | null | undefined,
+): BracketState {
+  const fixtures = knockoutFixturesFromResults(results)
+  const r32 = state.r32.map((pick, i) => {
+    const f = fixtures[i]
+    return pick && (f?.h?.n === pick || f?.a?.n === pick) ? pick : null
+  })
+  let s: BracketState = { ...state, r32 }
+
+  const validateRound = (picks: (string | null)[], round: string) =>
+    picks.map((pick, i) => {
+      if (!pick) return null
+      const { h, a } = getMatchTeams(s, round, i)
+      return h?.n === pick || a?.n === pick ? pick : null
+    })
+
+  s = { ...s, r16: validateRound(state.r16, 'r16') }
+  s = { ...s, qf: validateRound(state.qf, 'qf') }
+  s = { ...s, sf: validateRound(state.sf, 'sf') }
+
+  let final = state.final
+  if (final) {
+    const { h, a } = getMatchTeams(s, 'final', 0)
+    if (h?.n !== final && a?.n !== final) final = null
+  }
+  return { ...s, final }
+}
+
+export function knockoutComplete(state: BracketState): boolean {
+  return !!state.final
+}
+
+// ── BRACKET MODES ─────────────────────────────────────────────────────────────
+// Two independent bracket games:
+//   pickem  Up-Front Pick'em — whole bracket filled before the tournament; the
+//           knockout is seeded from the player's OWN predicted groups; everything
+//           locks at the group lock (first kickoff).
+//   reset   Bracket Reset — group + 3rd lock at the group lock, then the knockout
+//           re-opens seeded from the ACTUAL results and locks at the knockout lock.
+
+export type BracketMode = 'pickem' | 'reset'
+
+export const BRACKET_MODES: { key: BracketMode; label: string; blurb: string }[] = [
+  { key: 'pickem', label: 'Up-Front Pick’em', blurb: 'Fill the whole bracket before kickoff · locks Jun 11' },
+  { key: 'reset',  label: 'Bracket Reset',          blurb: 'Knockout re-opens from the real R32 after groups · locks Jun 28' },
+]
+
+// Is the knockout portion of this mode available to fill yet?
+//   pickem → as soon as the player's own group picks are complete (self-seeded).
+//   reset  → only once the real group stage is over (actual R32 known).
+export function bracketModeOpen(
+  mode: BracketMode,
+  state: BracketState,
+  results?: BracketResults | null,
+): boolean {
+  return mode === 'pickem' ? groupsComplete(state) : groupResultsComplete(results)
+}
+
+// When does this mode's knockout freeze?
+//   pickem → the group lock (single up-front lock).
+//   reset  → the knockout lock.
+export function bracketModeLock(mode: BracketMode): Date {
+  return mode === 'pickem' ? GROUP_LOCK : KNOCKOUT_LOCK
+}
+
+export function isBracketModeLocked(mode: BracketMode): boolean {
+  return new Date() >= bracketModeLock(mode)
+}
+
+// Match participants for a mode's knockout round.
+//   pickem → seeded from the player's own group picks (classic).
+//   reset  → seeded from the actual results (everyone shares the real R32).
+export function getModeMatchTeams(
+  mode: BracketMode,
+  state: BracketState,
+  results: BracketResults | null | undefined,
+  round: string,
+  i: number,
+): { h: BracketTeam | null; a: BracketTeam | null } {
+  return mode === 'pickem'
+    ? getMatchTeams(state, round, i)
+    : getKnockoutMatchTeams(state, results, round, i)
 }
 
 // ── TEAM HELPERS ──────────────────────────────────────────────────────────────

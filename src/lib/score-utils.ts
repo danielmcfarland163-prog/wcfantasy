@@ -41,26 +41,37 @@ export async function scoreBrackets(
   const { data: entries } = await supabase.from('bracket_entries').select('*')
   if (!entries?.length) return { scored: 0 }
 
-  const nowIso = new Date().toISOString()
-  let scored = 0
-
+  // Each user can have TWO bracket entries (pickem + reset). Sum each user's
+  // bracket points across modes into a single combined bracket score, so the
+  // second mode's upsert doesn't clobber the first and the leaderboards show
+  // Picks / Bracket(=pickem+reset) / Total. Per-mode points are shown in the UI.
+  const byUser = new Map<string, { points: number; correct: number }>()
   for (const entry of entries) {
     // Single source of truth for point values (GDD §2.2): see lib/bracket-scoring.ts
     const { points, correct } = scoreBracketEntry(entry, res)
+    const cur = byUser.get(entry.user_id) ?? { points: 0, correct: 0 }
+    cur.points += points
+    cur.correct += correct
+    byUser.set(entry.user_id, cur)
+  }
 
+  const nowIso = new Date().toISOString()
+  let scored = 0
+
+  for (const [user_id, agg] of byUser) {
     // ── Global scores: write only the Bracket-mode columns; preserve Picks ──
     const { data: existing } = await supabase
       .from('global_scores')
       .select('picks_points')
-      .eq('user_id', entry.user_id)
+      .eq('user_id', user_id)
       .single()
     const picksPts = existing?.picks_points ?? 0
 
     await supabase.from('global_scores').upsert({
-      user_id:         entry.user_id,
-      bracket_points:  points,
-      bracket_correct: correct,
-      total_points:    picksPts + points,
+      user_id,
+      bracket_points:  agg.points,
+      bracket_correct: agg.correct,
+      total_points:    picksPts + agg.points,
       updated_at:      nowIso,
     }, { onConflict: 'user_id' })
 
@@ -70,13 +81,13 @@ export async function scoreBrackets(
     const { data: memberships } = await supabase
       .from('league_members')
       .select('league_id')
-      .eq('user_id', entry.user_id)
+      .eq('user_id', user_id)
 
     for (const { league_id } of (memberships ?? [])) {
       await supabase.from('league_scores').upsert({
         league_id,
-        user_id:        entry.user_id,
-        bracket_points: points,
+        user_id,
+        bracket_points: agg.points,
         updated_at:     nowIso,
       }, { onConflict: 'league_id,user_id' })
       await supabase.rpc('recalculate_league_rankings', { p_league_id: league_id })

@@ -7,7 +7,7 @@ import AppShell from '@/components/AppShell'
 import Flag, { isoForTeam } from '@/components/ui/Flag'
 import { BracketDetail } from '@/components/BracketReviewer'
 import SummaryTabs from './SummaryTabs'
-import { isLocked, TOURNAMENT_LOCK } from '@/lib/bracket'
+import { isGroupLocked, isKnockoutLocked, GROUP_LOCK, KNOCKOUT_LOCK } from '@/lib/bracket'
 import { formatKickoff } from '@/lib/utils'
 
 const STAGE_LABELS: Record<string, string> = {
@@ -63,7 +63,7 @@ export default async function MemberPicksPage({ params }: { params: Promise<{ id
   // kicked off), so upcoming picks stay hidden. (Your own row returns everything.)
   const { data: picksRaw } = await supabase
     .from('picks')
-    .select('id, home_score_pick, away_score_pick, confidence_multiplier, points_earned, pick_result, match:matches(id, kickoff_time, stage, group_letter, status, home_score, away_score, home_team:teams!matches_home_team_id_fkey(name, short_code), away_team:teams!matches_away_team_id_fkey(name, short_code))')
+    .select('id, home_score_pick, away_score_pick, points_earned, pick_result, match:matches(id, kickoff_time, stage, group_letter, status, home_score, away_score, home_team:teams!matches_home_team_id_fkey(name, short_code), away_team:teams!matches_away_team_id_fkey(name, short_code))')
     .eq('user_id', userId)
 
   const picks = (picksRaw ?? [])
@@ -76,31 +76,34 @@ export default async function MemberPicksPage({ params }: { params: Promise<{ id
     .from('tournament_results').select('*').eq('id', 1).maybeSingle()
 
   const isSelf = userId === user.id
-  const locked = isLocked()
   const viewerIsAdmin = isAdminUser(user.id)
+  const canSeeAny = isSelf || viewerIsAdmin
+  // Each mode reveals to other members at its own final lock: pickem at the group
+  // lock, reset at the knockout lock.
+  const pickemVisible = canSeeAny || isGroupLocked()
+  const resetVisible = canSeeAny || isKnockoutLocked()
 
-  // Target's bracket. RLS hides other members' brackets until the tournament
-  // lock — but admins bypass it: if the lock-respecting read returns nothing for
-  // another member, re-fetch with the service-role client so an admin can review
-  // any bracket at any time. Editing stays locked; this is read-only.
-  let bracketEntry: any = (await supabase
+  // Target's brackets — now up to two rows (pickem + reset). RLS hides other
+  // members' rows until the group lock; admins bypass with the service-role client.
+  let bracketRows: any[] = (await supabase
     .from('bracket_entries')
     .select('*, profile:profiles(username, display_name)')
-    .eq('user_id', userId)
-    .maybeSingle()).data
+    .eq('user_id', userId)).data ?? []
   let adminBracketBypass = false
-  if (!bracketEntry && viewerIsAdmin && !isSelf) {
+  if (bracketRows.length === 0 && viewerIsAdmin && !isSelf) {
     try {
       const admin = createAdminSupabaseClient()
       const res = await admin
         .from('bracket_entries')
         .select('*, profile:profiles(username, display_name)')
         .eq('user_id', userId)
-        .maybeSingle()
-      if (res.data) { bracketEntry = res.data; adminBracketBypass = true }
+      if (res.data?.length) { bracketRows = res.data; adminBracketBypass = true }
     } catch { /* service key unavailable — fall back to the locked state */ }
   }
-  const lockLabel = TOURNAMENT_LOCK.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const pickemEntry = bracketRows.find((r: any) => r.mode === 'pickem') ?? null
+  const resetEntry = bracketRows.find((r: any) => r.mode === 'reset') ?? null
+  const groupLockLabel = GROUP_LOCK.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const knockoutLockLabel = KNOCKOUT_LOCK.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   const name = profile?.display_name ?? profile?.username ?? 'Player'
   const rank = score?.rank ?? score?.picks_rank ?? null
 
@@ -146,11 +149,6 @@ export default async function MemberPicksPage({ params }: { params: Promise<{ id
                 {STAGE_LABELS[m.stage] ?? m.stage}{m.group_letter ? ` ${m.group_letter}` : ''} · {formatKickoff(m.kickoff_time)}
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                {p.confidence_multiplier > 1 && (
-                  <span style={{ fontFamily: 'var(--f-mono)', fontSize: 9, fontWeight: 700, color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 12%, transparent)', borderRadius: 5, padding: '2px 5px' }}>
-                    ×{p.confidence_multiplier}
-                  </span>
-                )}
                 <span style={{ fontFamily: 'var(--f-mono)', fontSize: 9.5, fontWeight: 700, color: chip.fg, background: chip.bg, borderRadius: 6, padding: '3px 8px' }}>
                   {chip.label}
                 </span>
@@ -172,29 +170,44 @@ export default async function MemberPicksPage({ params }: { params: Promise<{ id
     </div>
   )
 
-  // ── Bracket panel ────────────────────────────────────────────────────────────
-  const hiddenForViewer = !isSelf && !locked && !viewerIsAdmin
-  const bracketContent = bracketEntry ? (
+  // ── Bracket panel (two modes: Up-Front Pick'em + Bracket Reset) ─────────────
+  const modePanel = (label: string, blurb: string, entry: any, visible: boolean, lockDateLabel: string) => {
+    const body = !visible ? (
+      <div style={{ padding: '28px 18px', textAlign: 'center', background: 'var(--surface)', border: '1px dashed var(--line)', borderRadius: 16 }}>
+        <div style={{ fontSize: 26, marginBottom: 8 }}>🔒</div>
+        <div style={{ fontFamily: 'var(--f-body)', fontSize: 12.5, color: 'var(--ink-3)' }}>Hidden until it locks on {lockDateLabel}.</div>
+      </div>
+    ) : entry ? (
+      <BracketDetail entry={entry as any} results={(tournamentResults ?? null) as any} />
+    ) : (
+      <div style={{ padding: '28px 18px', textAlign: 'center', background: 'var(--surface)', border: '1px dashed var(--line)', borderRadius: 16 }}>
+        <div style={{ fontSize: 26, marginBottom: 8 }}>🗂</div>
+        <div style={{ fontFamily: 'var(--f-body)', fontSize: 12.5, color: 'var(--ink-3)' }}>
+          {isSelf ? 'Not built yet — fill it on the Bracket tab.' : 'This player hasn’t filled out this bracket.'}
+        </div>
+      </div>
+    )
+    return (
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+          <span style={{ fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 16, color: 'var(--ink)' }}>{label}</span>
+          <span style={{ fontFamily: 'var(--f-mono)', fontSize: 9.5, color: 'var(--ink-3)' }}>{blurb}</span>
+        </div>
+        {body}
+      </div>
+    )
+  }
+
+  const bracketContent = (
     <>
       {adminBracketBypass && (
         <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, fontWeight: 700, color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 25%, var(--line))', borderRadius: 10, padding: '8px 12px', marginBottom: 10 }}>
-          🛡 ADMIN VIEW · this bracket is normally hidden until {lockLabel}
+          🛡 ADMIN VIEW · brackets are normally hidden from other members until they lock
         </div>
       )}
-      <BracketDetail entry={bracketEntry as any} results={(tournamentResults ?? null) as any} />
+      {modePanel('Up-Front Pick’em', `locks ${groupLockLabel}`, pickemEntry, pickemVisible, groupLockLabel)}
+      {modePanel('Bracket Reset', `locks ${knockoutLockLabel}`, resetEntry, resetVisible, knockoutLockLabel)}
     </>
-  ) : (
-    <div style={{ padding: '40px 20px', textAlign: 'center', background: 'var(--surface)', border: '1px dashed var(--line)', borderRadius: 18 }}>
-      <div style={{ fontSize: 30, marginBottom: 10 }}>{hiddenForViewer ? '🔒' : '🗂'}</div>
-      <div style={{ fontFamily: 'var(--f-cond)', fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>
-        {hiddenForViewer ? 'Bracket hidden for now' : 'No bracket submitted yet'}
-      </div>
-      <div style={{ fontFamily: 'var(--f-body)', fontSize: 13, color: 'var(--ink-3)', marginTop: 4 }}>
-        {hiddenForViewer
-          ? `Brackets stay private until they lock on ${lockLabel}.`
-          : (isSelf ? 'Build yours on the Bracket tab.' : 'This player hasn’t filled out a bracket.')}
-      </div>
-    </div>
   )
 
   return (

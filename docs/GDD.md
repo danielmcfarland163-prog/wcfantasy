@@ -1,6 +1,6 @@
 # Soccer Fantasy Game — Product Design Document
 
-**Version:** 0.4  
+**Version:** 0.5  
 **Last Updated:** 2026-06-08  
 **Platform:** Web (mobile-first)  
 **Stack:** Next.js, TypeScript, Tailwind CSS, Cloudflare Workers, Supabase
@@ -23,22 +23,21 @@ There are two independent fantasy game modes. Users can play one or both. League
 
 ### 2.1 My Picks (Match Predictor)
 
-Users predict the exact scoreline for every match before kickoff, with an optional confidence multiplier.
+Users predict the exact scoreline for every match before kickoff. Every match is worth the same — there is no confidence multiplier.
 
 **How it works:**
 - Predict home and away score for each match
-- Apply a confidence multiplier: 1×, 2×, or 3×
 - Picks lock at each match's kickoff time
 
 **Scoring:**
 
-| Result | Base Points | With Multiplier |
-|--------|------------|-----------------|
-| Wrong outcome | 0 | 0 |
-| Correct outcome (W/D/L) | 3 | 3 × multiplier |
-| Exact score | 5 (3 + 2 bonus) | 5 × multiplier |
+| Result | Points |
+|--------|--------|
+| Wrong outcome | 0 |
+| Correct outcome (W/D/L) | 3 |
+| Exact score | 5 (3 + 2 bonus) |
 
-**Maximum possible points:** every match predicted at the exact score with a 3× multiplier — e.g. the 72 seeded group matches × 5 pts × 3× = 1,080 pts, before knockout fixtures are added post-draw.
+**Maximum possible points:** every match predicted at the exact score — e.g. the 72 seeded group matches × 5 pts = 360 pts, before knockout fixtures are added post-draw.
 
 **Results populate to:** `picks` table (per match), `global_scores`, `league_scores.picks_points`.
 
@@ -46,18 +45,13 @@ Users predict the exact scoreline for every match before kickoff, with an option
 
 ### 2.2 Bracket (Tournament Predictor)
 
-Users fill out a complete tournament bracket before the first match kicks off. The bracket locks as a single snapshot.
+The Bracket game has **two independent modes** — players can play either or both, and each is scored separately on the same point values (below). Each pick sequence is the full bracket: group 1st/2nd (×12) → third-place qualifiers (8 of 12) → Round of 32 (16) → R16 (8) → QF (4) → SF (2) → Final (1).
 
-**Lock time:** June 11, 2026 at 15:00 UTC (first match kickoff).
+**Mode A — Up-Front Pick'em.** Fill the *entire* bracket before the tournament. The knockout is seeded from the player's **own predicted groups** — a wrong group call cascades through the bracket, classic-pool style. Everything locks as one snapshot at the first match kickoff (the *group lock*, June 11, 2026 15:00 UTC).
 
-**Pick sequence:**
-1. **Group stage** — pick 1st and 2nd place in each of 12 groups (A–L)
-2. **Third-place qualifiers** — pick which 8 third-place teams advance (out of 12)
-3. **Round of 32** — 16 knockout matches, pick winners
-4. **Round of 16** — 8 matches
-5. **Quarter-finals** — 4 matches
-6. **Semi-finals** — 2 matches
-7. **Final** — 1 match
+**Mode B — Bracket Reset.** Group 1st/2nd + third-place qualifiers are predicted up front and lock at the group lock. The knockout then **re-opens**, seeded from the **actual** Round of 32 (everyone fills out the same real bracket), and locks at the R32 kickoff (the *knockout lock*, June 28, 2026 19:00 UTC).
+
+Lock times are configurable via `NEXT_PUBLIC_BRACKET_LOCK` (group) and `NEXT_PUBLIC_KNOCKOUT_LOCK` (knockout). Each mode is one row in `bracket_entries`, keyed by `(user_id, mode)`. Reset's knockout unlocks automatically once `tournament_results` shows all 12 groups decided and the 8 third-place qualifiers known (`groupResultsComplete()`); per-mode seeding + locks live in `src/lib/bracket.ts`. Server-side, the trigger `enforce_bracket_phase_locks` freezes group columns at the group lock for both modes, and knockout columns at the **group** lock for pickem / the **knockout** lock for reset.
 
 **Scoring (per correct pick):**
 
@@ -71,9 +65,9 @@ Users fill out a complete tournament bracket before the first match kicks off. T
 | Semi-final correct winner | 13 pts |
 | Final correct winner (champion) | 21 pts |
 
-> Implemented and verified (2026-06-06): these exact values live in `src/lib/bracket-scoring.ts`, the single source of truth shared by `api/score-bracket` and the bracket UI. Theoretical max = **231 pts** (groups 48 · 3rd 16 · R32 48 · R16 40 · QF 32 · SF 26 · Final 21).
+> Implemented and verified (2026-06-06): these exact values live in `src/lib/bracket-scoring.ts`, the single source of truth shared by `api/score-bracket` and the bracket UI. Theoretical max = **231 pts per mode** (groups 48 · 3rd 16 · R32 48 · R16 40 · QF 32 · SF 26 · Final 21).
 
-**Results populate to:** `bracket_entries` (user bracket state), `tournament_results` (admin-maintained actuals), `global_scores`, `league_scores.bracket_points`.
+**Results populate to:** `bracket_entries` (one row per user **per mode**), `tournament_results` (admin-maintained actuals), and `global_scores` / `league_scores.bracket_points` — which hold the **sum of both modes** (Total = Picks + Pick'em + Reset). Per-mode points are shown in the bracket UI and the player summary; `scoreBrackets()` aggregates the two entries per user.
 
 ---
 
@@ -98,7 +92,7 @@ League: "The Lads ⚽"
   ...
 ```
 
-Tapping a row opens that member's read-only **player summary** (`/leagues/[id]/picks/[userId]`) — a Picks / Bracket tabbed view with their pick-by-pick scorelines (predicted vs. actual, Exact / Correct / Missed chips, confidence multiplier) and their full bracket with ✓/✗ vs. results. Another member's picks appear once the match is LIVE/FINISHED, and their bracket only after the tournament lock (admins can preview earlier).
+Tapping a row opens that member's read-only **player summary** (`/leagues/[id]/picks/[userId]`) — a Picks / Bracket tabbed view with their pick-by-pick scorelines (predicted vs. actual, Exact / Correct / Missed chips) and their full bracket with ✓/✗ vs. results. Another member's picks appear once the match is LIVE/FINISHED, and their bracket only after the knockout lock (admins can preview earlier).
 
 **Schema:** `league_scores` stores `picks_points` and `bracket_points` as separate columns, each with its own `rank` / `rank_change` pair; `total_points = picks + bracket` is recomputed by `recalculate_league_rankings()`. See [`../deployment/schema-dual-mode.sql`](deployment/schema-dual-mode.sql) for the migration.
 
@@ -129,15 +123,15 @@ Tapping a row opens that member's read-only **player summary** (`/leagues/[id]/p
 4. Prompted to make picks and/or fill bracket before lock
 
 ### Making Picks (My Picks)
-1. Open a match card → enter home/away score → set confidence → save
+1. Open a match card → enter home/away score → save
 2. Picks editable until kickoff
 3. Post-match: see result badge (EXACT / CORRECT / WRONG) and points earned
 
 ### Filling the Bracket
-1. Go to `/bracket`
-2. Complete groups → third-place qualifiers → knockout rounds sequentially
-3. Submit before tournament lock (June 11)
-4. Post-lock: bracket becomes read-only; scores populate as results come in
+1. Go to `/bracket` and pick a mode — **Up-Front Pick'em** or **Bracket Reset** (toggle at the top; each is its own game with its own score).
+2. **Pick'em:** fill the whole bracket (groups → 3rd → knockout, self-seeded from your groups) before June 11; it all locks at the first kickoff.
+3. **Reset:** pick groups + 3rd before June 11; after the group stage the knockout re-opens seeded from the real Round of 32 and locks June 28.
+4. Each mode becomes read-only at its lock; scores populate as results come in.
 
 ### Leagues
 1. Create a league or join via invite code
@@ -177,10 +171,11 @@ Tapping a row opens that member's read-only **player summary** (`/leagues/[id]/p
 |-----------|-------------|--------|
 | v0.1 | Bracket HTML prototype | Archived |
 | v0.2 | Next.js app scaffold + schema | Complete |
-| My Picks core | Scoreline + confidence predictions, locking, live scoring, result badges | Complete (2026-06-06) |
+| My Picks core | Scoreline predictions, locking, live scoring, result badges | Complete (2026-06-06) |
 | Bracket core | Sequential picker, lock + 24h countdown, submit confirmation, spec scoring, reviewer | Complete (2026-06-06) |
 | v0.3 | Dual-mode league standings schema | Complete (2026-06-06) |
 | Live automation | Cron worker, LIVE sync, knockout fixtures, client realtime; tests + CI gate | Complete (2026-06-06) |
 | Standings redesign | Picks/Bracket/Total table + tap-through player summaries; status-based picks visibility; set-based `score_picks()` RPC | Complete (2026-06-07) |
 | Hardening & audit | Team dedupe (48), `score_picks()` locked to service_role, docs refresh, stale-file cleanup | Complete (2026-06-08) |
+| v0.5 — format change | My Picks confidence multiplier removed (flat 0/3/5); **two bracket modes** — Up-Front Pick'em (self-seeded, single lock) + Bracket Reset (knockout re-seeded from real R32 after groups) | Complete (2026-06-08) |
 | v1.0 | Full tournament launch (knockouts seeded post-draw, deploy verified) | Pending |
