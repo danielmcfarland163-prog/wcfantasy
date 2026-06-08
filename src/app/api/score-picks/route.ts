@@ -17,7 +17,7 @@ async function handler(req: NextRequest) {
     const result = await scorePicks(supabase)
 
     if (result.scored === 0) {
-      return NextResponse.json({ message: 'Nothing to score', scored: 0 })
+      return NextResponse.json({ message: 'No new picks to score — standings refreshed', scored: 0 })
     }
 
     return NextResponse.json({

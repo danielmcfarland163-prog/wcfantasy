@@ -1,8 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import PillTabs from '@/components/ui/PillTabs'
+import Flag, { isoForTeam } from '@/components/ui/Flag'
 import { GROUP_KEYS, GROUPS } from '@/lib/bracket'
+import type { StandingRow } from '@/lib/standings'
+
+const GC: Record<string, string> = {
+  A:'#2f6fe0',B:'#1f9d5a',C:'#e03c2c',D:'#c98a1a',
+  E:'#7c3aed',F:'#0891b2',G:'#db2777',H:'#059669',
+  I:'#d97706',J:'#4f46e5',K:'#dc2626',L:'#0d9488',
+}
+const sCell: CSSProperties = { width:16, flexShrink:0, textAlign:'center', fontFamily:'var(--f-mono)', fontSize:11, color:'var(--ink-2)' }
+const sHead: CSSProperties = { width:16, flexShrink:0, textAlign:'center', fontFamily:'var(--f-mono)', fontSize:9, fontWeight:700, color:'var(--ink-3)', letterSpacing:'0.3px' }
 
 interface Score {
   user_id: string
@@ -20,6 +30,7 @@ interface Score {
 interface Props {
   scores: Score[]
   userId: string
+  standings: Record<string, StandingRow[]>
 }
 
 const MODES = ['Combined', 'Picks', 'Brackets'] as const
@@ -45,7 +56,7 @@ function detail(s: Score, mode: Mode): string {
   return `${s.picks_points ?? 0} picks + ${s.bracket_points ?? 0} bracket`
 }
 
-export default function StatsClient({ scores, userId }: Props) {
+export default function StatsClient({ scores, userId, standings }: Props) {
   const [mode, setMode] = useState<Mode>('Combined')
   const [tab, setTab]   = useState('Standings')
 
@@ -141,26 +152,61 @@ export default function StatsClient({ scores, userId }: Props) {
 
       {tab === 'Groups' && (
         <div style={{ padding:'0 20px', marginTop:18 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }} className="grp-grid">
+          <p style={{ fontFamily:'var(--f-body)', fontSize:12, color:'var(--ink-3)', margin:'0 0 14px' }}>
+            Live group standings. <span style={{ color:'var(--win)', fontWeight:700 }}>Top 2</span> of each group advance; the 8 best third-placed teams also qualify.
+          </p>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:12 }} className="grp-grid">
             {GROUP_KEYS.map(gk => {
-              const grp = GROUPS[gk]
+              const rows: StandingRow[] = standings[gk]?.length
+                ? standings[gk]
+                : GROUPS[gk].teams.map(t => ({ teamId:t.c, name:t.n, code:t.c, played:0, won:0, drawn:0, lost:0, gf:0, ga:0, gd:0, pts:0 }))
+              const color = GC[gk]
               return (
                 <div key={gk} style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:14, overflow:'hidden' }}>
-                  <div style={{ padding:'8px 12px', background:'var(--surface-2)', borderBottom:'1px solid var(--line)', fontFamily:'var(--f-mono)', fontSize:10, fontWeight:700, color:'var(--ink-3)', letterSpacing:'0.8px' }}>
-                    GROUP {gk}
+                  {/* Group header */}
+                  <div style={{ padding:'9px 12px', background:color }}>
+                    <span style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:14, color:'#fff' }}>GROUP {gk}</span>
                   </div>
-                  {grp.teams.map((t, i) => (
-                    <div key={t.n} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 12px', borderTop: i ? '1px solid var(--line)' : 'none' }}>
-                      <span style={{ fontSize:18 }}>{t.f}</span>
-                      <span style={{ fontFamily:'var(--f-body)', fontWeight:500, fontSize:13, color:'var(--ink)', flex:1 }}>{t.n}</span>
-                      <span style={{ fontFamily:'var(--f-mono)', fontSize:9, color:'var(--ink-3)' }}>{t.c}</span>
-                    </div>
-                  ))}
+                  {/* Column labels */}
+                  <div style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 12px', background:'var(--surface-2)', borderBottom:'1px solid var(--line)' }}>
+                    <span style={{ width:14, flexShrink:0, textAlign:'center', fontFamily:'var(--f-mono)', fontSize:9, fontWeight:700, color:'var(--ink-3)' }}>#</span>
+                    <span style={{ width:20, flexShrink:0 }} />
+                    <span style={{ flex:1, minWidth:0, fontFamily:'var(--f-mono)', fontSize:9, fontWeight:700, color:'var(--ink-3)', letterSpacing:'0.3px' }}>TEAM</span>
+                    <span style={sHead}>P</span>
+                    <span style={sHead}>W</span>
+                    <span style={sHead}>D</span>
+                    <span style={sHead}>L</span>
+                    <span style={{ ...sHead, width:24 }}>GD</span>
+                    <span style={{ ...sHead, width:24, color:'var(--ink-2)' }}>PTS</span>
+                  </div>
+                  {/* Rows */}
+                  {rows.map((r, i) => {
+                    const pos = i + 1
+                    const qualifies = pos <= 2
+                    return (
+                      <div key={r.teamId} style={{
+                        display:'flex', alignItems:'center', gap:6, padding:'8px 12px',
+                        borderTop: i>0 ? '1px solid var(--line)' : 'none',
+                        borderBottom: pos===2 ? '2px solid color-mix(in srgb,var(--win) 30%,var(--line))' : 'none',
+                        background: qualifies ? 'color-mix(in srgb,var(--win) 5%,var(--surface))' : 'var(--surface)',
+                      }}>
+                        <span style={{ width:14, flexShrink:0, textAlign:'center', fontFamily:'var(--f-mono)', fontWeight:700, fontSize:11, color: qualifies ? 'var(--win)' : 'var(--ink-3)' }}>{pos}</span>
+                        <Flag iso={isoForTeam(r.code)} size={20} radius={4} ring={false} alt={r.name} />
+                        <span style={{ flex:1, minWidth:0, fontFamily:'var(--f-body)', fontWeight:600, fontSize:13, color:'var(--ink)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.name}</span>
+                        <span style={sCell}>{r.played}</span>
+                        <span style={sCell}>{r.won}</span>
+                        <span style={sCell}>{r.drawn}</span>
+                        <span style={sCell}>{r.lost}</span>
+                        <span style={{ ...sCell, width:24, color: r.gd>0?'var(--win)':r.gd<0?'var(--live)':'var(--ink-2)' }}>{r.gd>0?'+':''}{r.gd}</span>
+                        <span style={{ ...sCell, width:24, fontWeight:800, color:'var(--ink)' }}>{r.pts}</span>
+                      </div>
+                    )
+                  })}
                 </div>
               )
             })}
           </div>
-          <style>{`@media(min-width:700px){.grp-grid{grid-template-columns:repeat(3,1fr)!important}}@media(min-width:960px){.grp-grid{grid-template-columns:repeat(4,1fr)!important}}`}</style>
+          <style>{`@media(min-width:900px){.grp-grid{grid-template-columns:repeat(2,1fr)!important}}@media(min-width:1320px){.grp-grid{grid-template-columns:repeat(3,1fr)!important}}`}</style>
         </div>
       )}
     </div>

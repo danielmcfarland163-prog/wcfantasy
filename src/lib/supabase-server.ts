@@ -27,12 +27,26 @@ export async function createServerSupabaseClient() {
   )
 }
 
-// Admin client — uses service role key, bypasses RLS.
+// Admin client - uses the service role / secret key, bypasses RLS.
 // ONLY use in server-side API routes, never expose to the client.
 export function createAdminSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  // Fail loudly with an actionable message. Without this, a missing or
+  // placeholder key silently produces an unauthenticated client and every
+  // query returns 401, which surfaces in the UI as a vague "API not working".
+  if (!url) {
+    throw new Error('Supabase admin client misconfigured: NEXT_PUBLIC_SUPABASE_URL is not set.')
+  }
+  const looksValid = key && !key.startsWith('PASTE_') && (key.startsWith('sb_secret_') || key.startsWith('eyJ'))
+  if (!looksValid) {
+    throw new Error(
+      'Supabase admin client misconfigured: SUPABASE_SERVICE_ROLE_KEY is missing or a placeholder. ' +
+      'Set it to the project secret key (sb_secret_...) in .env.local for local dev, and on the ' +
+      'deployed Worker via: wrangler secret put SUPABASE_SERVICE_ROLE_KEY'
+    )
+  }
+
+  return createClient(url, key as string, { auth: { persistSession: false } })
 }

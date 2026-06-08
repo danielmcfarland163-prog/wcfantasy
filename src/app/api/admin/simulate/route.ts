@@ -87,6 +87,12 @@ export async function POST(req: NextRequest) {
       .update({ total_points: 0, picks_points: 0, bracket_points: 0, picks_correct: 0, bracket_correct: 0, correct_results: 0, picks_made: 0, global_rank: null, updated_at: new Date().toISOString() })
       .neq('user_id', '00000000-0000-0000-0000-000000000000')
 
+    // Clear league standings too. Without this, league tables keep their stale
+    // picks/bracket points after a reset and no longer line up with global scores.
+    await db.from('league_scores')
+      .update({ total_points: 0, picks_points: 0, bracket_points: 0, correct_results: 0, exact_scores: 0, picks_made: 0, bracket_correct: 0, rank: null, picks_rank: null, bracket_rank: null, rank_change: 0, picks_rank_change: 0, bracket_rank_change: 0, updated_at: new Date().toISOString() })
+      .neq('user_id', '00000000-0000-0000-0000-000000000000')
+
     await db.from('tournament_results').update({
       group_results: {}, third_quals: [],
       r32_results: [], r16_results: [], qf_results: [], sf_results: [],

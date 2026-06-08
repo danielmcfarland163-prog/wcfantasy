@@ -32,12 +32,10 @@ export async function scorePicks(
     .is('scored_at', null)
     .in('match_id', finishedIds)
 
-  if (!unscoredPicks?.length) return { scored: 0, users: 0 }
-
   // Score each pick with the scoreline model: 0 (wrong) / 3 (correct outcome) /
   // 5 (exact score), multiplied by the confidence multiplier (1×/2×/3×).
   const updates: Array<{ id: string; user_id: string; points: number; result: 'EXACT' | 'CORRECT' | 'WRONG' }> = []
-  for (const pick of unscoredPicks as any[]) {
+  for (const pick of (unscoredPicks ?? []) as any[]) {
     const scores = scoreMap[pick.match_id]
     if (!scores) continue
     const { points, result } = scorePick(
@@ -51,19 +49,21 @@ export async function scorePicks(
     updates.push({ id: pick.id, user_id: pick.user_id, points, result })
   }
 
-  if (!updates.length) return { scored: 0, users: 0 }
+  // Persist per-pick scores for any newly-scored picks (may be none on a re-run).
+  if (updates.length) {
+    await Promise.all(updates.map(u =>
+      supabase.from('picks').update({
+        points_earned: u.points,
+        pick_result:   u.result,
+        scored_at:     new Date().toISOString(),
+      }).eq('id', u.id),
+    ))
+  }
 
-  // Persist per-pick scores
-  await Promise.all(updates.map(u =>
-    supabase.from('picks').update({
-      points_earned: u.points,
-      pick_result:   u.result,
-      scored_at:     new Date().toISOString(),
-    }).eq('id', u.id),
-  ))
-
-  // Re-aggregate standings for EVERY user with any scored pick (keeps this idempotent —
-  // re-running over already-scored matches recomputes the same totals).
+  // Re-aggregate standings for EVERY user with any scored pick. This ALWAYS runs,
+  // even when there were no new picks to score, so re-running "Score picks" reliably
+  // repairs a zeroed or partial aggregation instead of being a no-op once picks are
+  // marked scored. It is idempotent: recomputing over scored picks yields the same totals.
   const { data: scoredRows } = await supabase
     .from('picks')
     .select('user_id, points_earned, pick_result')

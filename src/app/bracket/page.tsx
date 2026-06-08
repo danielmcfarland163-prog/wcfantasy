@@ -28,7 +28,6 @@ export default async function BracketPage() {
   return (
     <AppShell>
       <div style={{ padding: '8px 20px 14px' }}>
-        <div className="wc-eyebrow">THE ROAD TO METLIFE</div>
         <h1 className="wc-title">My Bracket</h1>
         {locked && (
           <div style={{

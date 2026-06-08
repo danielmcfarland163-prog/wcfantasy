@@ -185,7 +185,7 @@ function GroupsTab({ state, locked, onUpdate, onNext, results }: { state:Bracket
                 return (
                   <button key={tm.n} disabled={locked} onClick={() => onUpdate(pickGroup(state, gk, tm.n))}
                     style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'10px 14px', textAlign:'left', border:'none', borderTop:idx>0?'1px solid var(--line)':'none', background:is1?'color-mix(in srgb,var(--gold) 8%,var(--surface))':is2?'color-mix(in srgb,var(--ink) 4%,var(--surface))':'var(--surface)', cursor:locked?'default':'pointer', transition:'background .12s' }}>
-                    <span style={{ fontSize:22, lineHeight:1, flexShrink:0 }}>{tm.f}</span>
+                    <Flag iso={isoForTeam(tm.c)} size={22} radius={5} ring={false} alt={tm.n} />
                     <span style={{ flex:1, fontFamily:'var(--f-body)', fontWeight:600, fontSize:14, color:'var(--ink)' }}>{tm.n}</span>
                     <span style={{ width:32, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontFamily:'var(--f-mono)', fontWeight:700, fontSize:10, background:is1?'var(--gold)':is2?'color-mix(in srgb,var(--ink) 18%,transparent)':'var(--surface-2)', color:is1?'#fff':is2?'var(--ink)':'var(--ink-3)' }}>
                       {is1?'1ST':is2?'2ND':'·'}
@@ -781,7 +781,7 @@ function StandingsTab({ results }: { results: TournamentResults | null }) {
                     <span style={{ width:28, height:20, borderRadius:5, background:posBg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontFamily:'var(--f-mono)', fontWeight:700, fontSize:9, color:posClr }}>
                       {posLabels[pos]}
                     </span>
-                    <span style={{ fontSize:18, lineHeight:1, flexShrink:0 }}>{t.f}</span>
+                    <Flag iso={isoForTeam(t.c)} size={20} radius={5} ring={false} alt={t.n} />
                     <span style={{ flex:1, fontFamily:'var(--f-body)', fontWeight:600, fontSize:13, color:isElim?'var(--ink-3)':'var(--ink)' }}>{name}</span>
                     {adv === 'R32' && <span style={{ fontFamily:'var(--f-mono)', fontSize:9, fontWeight:700, color:'var(--win)', flexShrink:0 }}>R32 ✓</span>}
                     {adv === 'ADV' && <span style={{ fontFamily:'var(--f-mono)', fontSize:9, fontWeight:700, color:'var(--accent)', flexShrink:0 }}>ADV ✓</span>}
