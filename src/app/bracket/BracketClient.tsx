@@ -836,8 +836,10 @@ function SummaryTab({ state, mode, onGoTo, results, groupLocked, bracketLocked, 
         ))}
       </div>
 
-      {/* Group picks */}
-      {groupsDone && (
+      {/* Group picks — pick'em only. Reset re-seeds its knockout from the real R32,
+          so its Summary focuses on the knockout; group/3rd points still count and
+          are itemised in the Bracket Points card above. */}
+      {isPickem && groupsDone && (
         <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:16, overflow:'hidden' }}>
           <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--line)', background:'var(--surface-2)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <span style={{ fontFamily:'var(--f-mono)', fontSize:10, fontWeight:700, color:'var(--ink-3)', letterSpacing:'1px' }}>⚽ GROUP STAGE PICKS</span>
@@ -881,8 +883,8 @@ function SummaryTab({ state, mode, onGoTo, results, groupLocked, bracketLocked, 
         </div>
       )}
 
-      {/* 3rd-place */}
-      {state.tq.length>0 && (
+      {/* 3rd-place — pick'em only (see note above). */}
+      {isPickem && state.tq.length>0 && (
         <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:16, overflow:'hidden' }}>
           <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--line)', background:'var(--surface-2)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <span style={{ fontFamily:'var(--f-mono)', fontSize:10, fontWeight:700, color:'var(--ink-3)', letterSpacing:'1px' }}>🟢 3RD-PLACE QUALIFIERS</span>

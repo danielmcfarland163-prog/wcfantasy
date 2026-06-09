@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+### Fix: Bracket Reset summary re-listed group/3rd recaps (2026-06-08)
+
+- **Symptom.** On `/bracket` in **Bracket Reset** mode, the Summary tab re-listed the full **Group Stage Picks** grid and **3rd-Place Qualifiers** chips — the same up-front predictions already entered on the Groups / 3rd tabs — so the reset view read like the whole bracket instead of the knockout it re-seeds from the real R32.
+- **Fix.** `src/app/bracket/BracketClient.tsx` (`SummaryTab`) gates those two recap sections to **pick'em only** (`isPickem && …`). In reset mode the Summary now shows just the knockout picks recap + champion alongside the Bracket Points card. Up-Front Pick'em is unchanged.
+- **Scoring untouched.** No change to `scoreBracketEntry` / `score-utils` / standings — group + 3rd points still count toward the reset entry's score (231 / mode) and stay itemised in the **Bracket Points** breakdown card; only the redundant detailed recaps are hidden.
+- **Verification.** Two-line conditional change (`isPickem &&` added to the group + 3rd recap blocks); `isPickem` already in `SummaryTab` scope. Run `npm run build` on the host to confirm types end-to-end.
+
 ### Fix: invite links 404 (`/join/[code]` route added) (2026-06-08)
 
 - **Symptom.** Clicking a copied league invite (`…/soccer-fantasy/join/<CODE>` from `generateInviteUrl`) 404'd — the route never existed, though `/join` was already whitelisted in middleware. Joining only worked via the manual code box (`POST /api/join-league`).
