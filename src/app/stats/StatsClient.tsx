@@ -4,6 +4,7 @@ import { useState, type CSSProperties } from 'react'
 import PillTabs from '@/components/ui/PillTabs'
 import Flag, { isoForTeam } from '@/components/ui/Flag'
 import { GROUP_KEYS, GROUPS } from '@/lib/bracket'
+import { MATCH_PICKS_ENABLED } from '@/lib/features'
 import type { StandingRow } from '@/lib/standings'
 
 const GC: Record<string, string> = {
@@ -33,8 +34,10 @@ interface Props {
   standings: Record<string, StandingRow[]>
 }
 
-const MODES = ['Combined', 'Picks', 'Brackets'] as const
-type Mode = typeof MODES[number]
+type Mode = 'Combined' | 'Picks' | 'Brackets'
+const ALL_MODES: Mode[] = ['Combined', 'Picks', 'Brackets']
+// Match Picks hidden for now — only the bracket leaderboard remains.
+const MODES: Mode[] = MATCH_PICKS_ENABLED ? ALL_MODES : ['Brackets']
 
 function sorted(scores: Score[], mode: Mode): Score[] {
   return [...scores].sort((a, b) => {
@@ -57,7 +60,7 @@ function detail(s: Score, mode: Mode): string {
 }
 
 export default function StatsClient({ scores, userId, standings }: Props) {
-  const [mode, setMode] = useState<Mode>('Combined')
+  const [mode, setMode] = useState<Mode>(MATCH_PICKS_ENABLED ? 'Combined' : 'Brackets')
   const [tab, setTab]   = useState('Standings')
 
   const rows   = sorted(scores, mode)
@@ -76,7 +79,8 @@ export default function StatsClient({ scores, userId, standings }: Props) {
       {tab === 'Standings' && (
         <div style={{ padding: '0 20px', marginTop: 18 }}>
 
-          {/* Mode switcher */}
+          {/* Mode switcher — hidden when only one mode is available */}
+          {MODES.length > 1 && (
           <div style={{ display:'flex', gap:4, padding:3, borderRadius:11, background:'var(--surface-2)', marginBottom:20 }}>
             {MODES.map(m => (
               <button key={m} onClick={() => setMode(m)} style={{
@@ -88,6 +92,7 @@ export default function StatsClient({ scores, userId, standings }: Props) {
               }}>{m}</button>
             ))}
           </div>
+          )}
 
           {/* My rank card */}
           {me && (

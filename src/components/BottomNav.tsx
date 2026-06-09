@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import LiveDot from '@/components/ui/LiveDot'
+import { MATCH_PICKS_ENABLED } from '@/lib/features'
 
 const NAV = [
   {
@@ -14,7 +15,7 @@ const NAV = [
       </svg>
     ),
   },
-  {
+  ...(MATCH_PICKS_ENABLED ? [{
     href: '/picks',
     label: 'Picks',
     icon: (
@@ -22,7 +23,7 @@ const NAV = [
         <path d="M9 12l2 2 4-4M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
       </svg>
     ),
-  },
+  }] : []),
   {
     href: '/live',
     label: 'Live',

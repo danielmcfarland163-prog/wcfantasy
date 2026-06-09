@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
+import { MATCH_PICKS_ENABLED } from '@/lib/features'
 import AppShell from '@/components/AppShell'
 import PicksClient from './PicksClient'
 import type { MatchWithPick } from '@/lib/types'
@@ -7,6 +8,10 @@ import { isMatchLocked } from '@/lib/utils'
 import { format } from 'date-fns'
 
 export default async function PicksPage() {
+  // Match Picks is hidden for now (Up-Front Pick'em only) — send visitors who hit
+  // the route directly to the bracket. Flip MATCH_PICKS_ENABLED to restore.
+  if (!MATCH_PICKS_ENABLED) redirect('/bracket')
+
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')

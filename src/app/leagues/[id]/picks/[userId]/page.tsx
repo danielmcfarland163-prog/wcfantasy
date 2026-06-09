@@ -7,7 +7,8 @@ import AppShell from '@/components/AppShell'
 import Flag, { isoForTeam } from '@/components/ui/Flag'
 import { BracketDetail } from '@/components/BracketReviewer'
 import SummaryTabs from './SummaryTabs'
-import { isGroupLocked, isKnockoutLocked, GROUP_LOCK, KNOCKOUT_LOCK } from '@/lib/bracket'
+import { isGroupLocked, isKnockoutLocked, GROUP_LOCK, KNOCKOUT_LOCK, BRACKET_RESET_ENABLED } from '@/lib/bracket'
+import { MATCH_PICKS_ENABLED } from '@/lib/features'
 import { formatKickoff } from '@/lib/utils'
 
 const STAGE_LABELS: Record<string, string> = {
@@ -205,8 +206,8 @@ export default async function MemberPicksPage({ params }: { params: Promise<{ id
           🛡 ADMIN VIEW · brackets are normally hidden from other members until they lock
         </div>
       )}
-      {modePanel('Up-Front Pick’em', `locks ${groupLockLabel}`, pickemEntry, pickemVisible, groupLockLabel)}
-      {modePanel('Bracket Reset', `locks ${knockoutLockLabel}`, resetEntry, resetVisible, knockoutLockLabel)}
+      {modePanel(BRACKET_RESET_ENABLED ? 'Up-Front Pick’em' : 'Bracket', `locks ${groupLockLabel}`, pickemEntry, pickemVisible, groupLockLabel)}
+      {BRACKET_RESET_ENABLED && modePanel('Bracket Reset', `locks ${knockoutLockLabel}`, resetEntry, resetVisible, knockoutLockLabel)}
     </>
   )
 
@@ -238,9 +239,9 @@ export default async function MemberPicksPage({ params }: { params: Promise<{ id
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.15)' }}>
               {stat('RANK', rank ? `#${rank}` : '—')}
-              {stat('TOTAL', score?.total_points ?? 0)}
-              {stat('PICKS', score?.picks_points ?? 0)}
-              {stat('BRACKET', score?.bracket_points ?? 0)}
+              {stat('TOTAL', (MATCH_PICKS_ENABLED ? score?.total_points : score?.bracket_points) ?? 0)}
+              {MATCH_PICKS_ENABLED && stat('PICKS', score?.picks_points ?? 0)}
+              {MATCH_PICKS_ENABLED && stat('BRACKET', score?.bracket_points ?? 0)}
             </div>
           </div>
         </div>

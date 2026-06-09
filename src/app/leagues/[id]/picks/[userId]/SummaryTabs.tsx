@@ -1,12 +1,16 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import { MATCH_PICKS_ENABLED } from '@/lib/features'
 
 // Client tab switcher for the per-player summary. The Picks and Bracket panels
 // are server-rendered and passed in as props (RSC children), so this only owns
 // the active-tab state.
 export default function SummaryTabs({ picks, bracket }: { picks: ReactNode; bracket: ReactNode }) {
   const [tab, setTab] = useState<'picks' | 'bracket'>('picks')
+
+  // Match Picks hidden for now — show the bracket on its own, no tab switcher.
+  if (!MATCH_PICKS_ENABLED) return <>{bracket}</>
 
   const tabs: { key: 'picks' | 'bracket'; label: string }[] = [
     { key: 'picks',   label: '⚽ Match Picks' },

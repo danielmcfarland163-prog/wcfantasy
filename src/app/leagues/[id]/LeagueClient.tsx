@@ -5,6 +5,7 @@ import Link from 'next/link'
 import LeagueChat from '@/components/LeagueChat'
 import CopyInviteButton from '@/components/CopyInviteButton'
 import RealtimeRefresh from '@/components/RealtimeRefresh'
+import { MATCH_PICKS_ENABLED } from '@/lib/features'
 
 type GameMode = 'picks' | 'bracket' | 'both' | 'combined'
 
@@ -56,7 +57,8 @@ interface LeagueClientProps {
 
 export default function LeagueClient({ league, scores, currentUserId, currentProfile, inviteUrl }: LeagueClientProps) {
   const mode: GameMode = league.game_mode ?? 'both'
-  const modeMeta = MODE_META[mode]
+  // Match Picks is hidden for now, so present every league as a Bracket game.
+  const modeMeta = MATCH_PICKS_ENABLED ? MODE_META[mode] : MODE_META.bracket
 
   // Open at the top: AppShell scrolls an inner container (.wc-noscroll), not the
   // window, so default scroll restoration can leave the page mid-scroll.
@@ -72,7 +74,7 @@ export default function LeagueClient({ league, scores, currentUserId, currentPro
 
   const picksOf   = (s: Score) => s.picks_points ?? 0
   const bracketOf = (s: Score) => s.bracket_points ?? 0
-  const totalOf   = (s: Score) => picksOf(s) + bracketOf(s)
+  const totalOf   = (s: Score) => MATCH_PICKS_ENABLED ? picksOf(s) + bracketOf(s) : bracketOf(s)
 
   const sorted = [...scores].sort((a, b) => totalOf(b) - totalOf(a) || picksOf(b) - picksOf(a))
   const medals = ['🥇', '🥈', '🥉']
@@ -138,7 +140,7 @@ export default function LeagueClient({ league, scores, currentUserId, currentPro
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: 'var(--surface-2)', borderBottom: '1px solid var(--line)' }}>
                   <span style={{ ...headCell, width: 22 }}>#</span>
                   <span style={{ flex: 1, minWidth: 92, fontFamily: 'var(--f-mono)', fontSize: 9, fontWeight: 700, color: 'var(--ink-3)', letterSpacing: '0.3px' }}>PLAYER</span>
-                  <span style={{ ...headCell, width: 42 }} title="Match picks points">PICKS</span>
+                  {MATCH_PICKS_ENABLED && <span style={{ ...headCell, width: 42 }} title="Match picks points">PICKS</span>}
                   <span style={{ ...headCell, width: 48 }} title="Bracket points">BRACKET</span>
                   <span style={{ ...headCell, width: 50, color: 'var(--ink-2)' }} title="Combined total">TOTAL</span>
                   <span style={{ width: 14, flexShrink: 0 }} aria-hidden />
@@ -176,7 +178,7 @@ export default function LeagueClient({ league, scores, currentUserId, currentPro
                           )}
                         </div>
                       </div>
-                      <span style={{ ...numCell, width: 42 }}>{picksOf(s)}</span>
+                      {MATCH_PICKS_ENABLED && <span style={{ ...numCell, width: 42 }}>{picksOf(s)}</span>}
                       <span style={{ ...numCell, width: 48 }}>{bracketOf(s)}</span>
                       <span style={{ ...numCell, width: 50, fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 17, color: 'var(--ink)' }}>{totalOf(s)}</span>
                       <span style={{ width: 14, flexShrink: 0, textAlign: 'center', color: 'var(--ink-3)', fontSize: 15, lineHeight: 1 }}>›</span>
@@ -187,7 +189,7 @@ export default function LeagueClient({ league, scores, currentUserId, currentPro
             </div>
 
             <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--ink-3)', marginTop: 8, lineHeight: 1.5 }}>
-              TOTAL = picks + bracket. Tap a player to see their full picks &amp; bracket.
+              {MATCH_PICKS_ENABLED ? 'TOTAL = picks + bracket. Tap a player to see their full picks & bracket.' : 'Tap a player to see their full bracket.'}
             </div>
           </>
         )}

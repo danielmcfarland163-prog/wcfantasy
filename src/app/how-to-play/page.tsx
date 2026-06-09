@@ -1,10 +1,12 @@
 import Link from 'next/link'
 import type { CSSProperties, ReactNode } from 'react'
 import AppShell from '@/components/AppShell'
+import { MATCH_PICKS_ENABLED } from '@/lib/features'
+import { BRACKET_RESET_ENABLED } from '@/lib/bracket'
 
 export const metadata = {
   title: 'How to Play · Soccer Fantasy',
-  description: 'How scoring works for Match Picks and the Bracket, plus leagues and standings.',
+  description: 'How the bracket scores, plus leagues and standings.',
 }
 
 /* ── Small presentational helpers (server-only, no hooks) ─────────── */
@@ -76,7 +78,7 @@ function ScoreRow({
   )
 }
 
-// Compact mode card for the two bracket modes.
+// Compact mode card for the bracket mode(s).
 function ModeCard({ tag, tagColor, title, children }: { tag: string; tagColor: string; title: string; children: ReactNode }) {
   return (
     <Card style={{ flex: '1 1 280px' }}>
@@ -103,15 +105,17 @@ export default function HowToPlayPage() {
           <div className="wc-eyebrow">THE RULES</div>
           <h1 className="wc-title">How to Play</h1>
           <p style={{ fontFamily: 'var(--f-body)', fontSize: 15, lineHeight: 1.6, color: 'var(--ink-2)', margin: '10px 0 0', maxWidth: 560 }}>
-            Two games, one tournament. Predict match scorelines, fill out the bracket, and climb your
-            league table. Play one game or both — they&rsquo;re scored separately and add up to your total.
+            {MATCH_PICKS_ENABLED
+              ? <>Two games, one tournament. Predict match scorelines, fill out the bracket, and climb your
+                league table. Play one game or both &mdash; they&rsquo;re scored separately and add up to your total.</>
+              : <>Fill out your tournament bracket and climb your league table as the results roll in.</>}
           </p>
         </div>
 
         {/* Quick overview chips */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, padding: '18px 20px 0' }}>
           {[
-            { icon: '⚽', label: 'Match Picks', sub: 'Predict scorelines' },
+            ...(MATCH_PICKS_ENABLED ? [{ icon: '⚽', label: 'Match Picks', sub: 'Predict scorelines' }] : []),
             { icon: '🗂', label: 'Bracket', sub: 'Predict the run' },
             { icon: '🏆', label: 'Leagues', sub: 'Beat your friends' },
           ].map(c => (
@@ -128,7 +132,8 @@ export default function HowToPlayPage() {
           ))}
         </div>
 
-        {/* ── MATCH PICKS ─────────────────────────────────────────── */}
+        {/* ── MATCH PICKS (hidden for now) ─────────────────────────── */}
+        {MATCH_PICKS_ENABLED && (
         <Section id="picks" eyebrow="GAME 1" title="Match Picks">
           <Lead>
             Predict the <strong style={{ color: 'var(--ink)' }}>exact final score</strong> of every match — home and away.
@@ -162,28 +167,40 @@ export default function HowToPlayPage() {
             </div>
           </Card>
         </Section>
+        )}
 
         {/* ── BRACKET ─────────────────────────────────────────────── */}
-        <Section id="bracket" eyebrow="GAME 2" title="Bracket">
+        <Section id="bracket" eyebrow={MATCH_PICKS_ENABLED ? 'GAME 2' : 'THE GAME'} title="Bracket">
           <Lead>
             Call the whole tournament: who tops each group, who finishes second, which third-place teams
             advance, and the winner of every knockout tie through to the champion. The deeper the round,
             the more each correct call is worth.
           </Lead>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
-            <ModeCard tag="Mode A · one lock" tagColor="var(--accent)" title="Up-Front Pick&rsquo;em">
-              A <strong style={{ color: 'var(--ink)' }}>survivor pool</strong>, filled before a ball is kicked. From your
-              32 qualifiers you pick who <em>advances</em> each round — 16 reach the Round of 16, then 8, 4, 2,
-              and your champion. No matchups, so a missed group pick never cascades; a team just has to get there.
-              Locks at the first match.
-            </ModeCard>
-            <ModeCard tag="Mode B · two stages" tagColor="var(--win)" title="Bracket Reset">
-              Predict group finishes and third-place qualifiers up front. Once the group stage is done, the
-              knockout <strong style={{ color: 'var(--ink)' }}>re-opens</strong>, seeded from the real Round of 32 —
-              everyone fills the same true bracket — and locks at the Round of 32 kickoff.
-            </ModeCard>
-          </div>
+          {BRACKET_RESET_ENABLED ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+              <ModeCard tag="Mode A · one lock" tagColor="var(--accent)" title="Up-Front Pick&rsquo;em">
+                A <strong style={{ color: 'var(--ink)' }}>survivor pool</strong>, filled before a ball is kicked. From your
+                32 qualifiers you pick who <em>advances</em> each round — 16 reach the Round of 16, then 8, 4, 2,
+                and your champion. No matchups, so a missed group pick never cascades; a team just has to get there.
+                Locks at the first match.
+              </ModeCard>
+              <ModeCard tag="Mode B · two stages" tagColor="var(--win)" title="Bracket Reset">
+                Predict group finishes and third-place qualifiers up front. Once the group stage is done, the
+                knockout <strong style={{ color: 'var(--ink)' }}>re-opens</strong>, seeded from the real Round of 32 —
+                everyone fills the same true bracket — and locks at the Round of 32 kickoff.
+              </ModeCard>
+            </div>
+          ) : (
+            <div style={{ marginBottom: 14 }}>
+              <ModeCard tag="Survivor pool" tagColor="var(--accent)" title="Up-Front Pick&rsquo;em">
+                A <strong style={{ color: 'var(--ink)' }}>survivor pool</strong>, filled before a ball is kicked. From your
+                32 qualifiers you pick who <em>advances</em> each round — 16 reach the Round of 16, then 8, 4, 2,
+                and your champion. No matchups, so a missed group pick never cascades; a team just has to get there.
+                The whole bracket locks at the first match.
+              </ModeCard>
+            </div>
+          )}
 
           <Card>
             <div className="wc-section-head" style={{ marginBottom: 4 }}>Scoring · per correct pick</div>
@@ -205,9 +222,11 @@ export default function HowToPlayPage() {
           }}>
             <span style={{ fontSize: 18 }}>🎯</span>
             <span style={{ fontFamily: 'var(--f-body)', fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.5 }}>
-              A flawless bracket is worth <strong style={{ color: 'var(--ink)' }}>231 points</strong>. In Up-Front
-              Pick&rsquo;em you earn a round&rsquo;s points for every team that <em>reaches</em> it; in Bracket Reset, for
-              every correct matchup winner. Each mode is scored on its own, so playing both is two shots at a perfect run.
+              A flawless bracket is worth <strong style={{ color: 'var(--ink)' }}>231 points</strong>. {BRACKET_RESET_ENABLED
+                ? <>In Up-Front Pick&rsquo;em you earn a round&rsquo;s points for every team that <em>reaches</em> it; in Bracket Reset, for
+                  every correct matchup winner. Each mode is scored on its own, so playing both is two shots at a perfect run.</>
+                : <>You earn a round&rsquo;s points for every team that <em>reaches</em> it &mdash; a team just has to get there,
+                  not win a specific tie.</>}
             </span>
           </div>
         </Section>
@@ -216,7 +235,7 @@ export default function HowToPlayPage() {
         <Section id="leagues" eyebrow="COMPETE" title="Leagues & Standings">
           <Lead>
             Create a league and share its invite code, or join one with a friend&rsquo;s. Inside, your table
-            shows three numbers for every player.
+            shows {MATCH_PICKS_ENABLED ? 'three numbers' : 'how'} every player {MATCH_PICKS_ENABLED ? '' : 'is doing'}.
           </Lead>
 
           <Card style={{ padding: 0, overflow: 'hidden' }}>
@@ -225,9 +244,9 @@ export default function HowToPlayPage() {
               <span style={{ flex: 2, fontFamily: 'var(--f-mono)', fontSize: 9, fontWeight: 700, color: 'var(--ink-3)', letterSpacing: '0.4px' }}>WHAT IT MEANS</span>
             </div>
             {[
-              ['Picks', 'Everything you&rsquo;ve earned from match scorelines'],
-              ['Bracket', 'Your combined points across both bracket modes'],
-              ['Total', 'Picks + Bracket — the table is ranked on this'],
+              ...(MATCH_PICKS_ENABLED ? [['Picks', 'Everything you&rsquo;ve earned from match scorelines']] : []),
+              ['Bracket', MATCH_PICKS_ENABLED ? 'Your combined points across both bracket modes' : 'Points from your bracket &mdash; the table is ranked on this'],
+              ...(MATCH_PICKS_ENABLED ? [['Total', 'Picks + Bracket — the table is ranked on this']] : []),
             ].map(([k, v], i) => (
               <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 16px', borderTop: i ? '1px solid var(--line)' : 'none' }}>
                 <span style={{ flex: 1, fontFamily: 'var(--f-cond)', fontWeight: 800, fontSize: 15, color: 'var(--ink)' }}>{k}</span>
@@ -238,8 +257,10 @@ export default function HowToPlayPage() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
             {[
-              ['🔀', 'Scored independently', 'A strong bracket can&rsquo;t paper over weak picks, and vice versa — both games stand on their own.'],
-              ['👀', 'Tap to scout', 'Open any player to see their full picks and bracket. Their scorelines show once a match is live or finished; their bracket reveals at its lock.'],
+              ...(MATCH_PICKS_ENABLED ? [['🔀', 'Scored independently', 'A strong bracket can&rsquo;t paper over weak picks, and vice versa — both games stand on their own.']] : []),
+              ['👀', 'Tap to scout', MATCH_PICKS_ENABLED
+                ? 'Open any player to see their full picks and bracket. Their scorelines show once a match is live or finished; their bracket reveals at its lock.'
+                : 'Open any player to see their full bracket. It reveals once it locks.'],
               ['🌍', 'Global leaderboard', 'See how you rank against every player, not just your league.'],
               ['💬', 'League chat', 'Talk trash in real time — there&rsquo;s even a one-tap random taunt.'],
             ].map(([icon, h, b]) => (
@@ -257,9 +278,9 @@ export default function HowToPlayPage() {
         {/* ── LOCKS ───────────────────────────────────────────────── */}
         <Section id="locks" eyebrow="DON'T MISS IT" title="When picks lock">
           <Card>
-            <ScoreRow first label="Match Picks" note="Each pick locks at that match&rsquo;s kickoff" pts="⏱" tone="muted" />
-            <ScoreRow label="Up-Front Pick&rsquo;em" note="The whole bracket locks at the first match" pts="⏱" tone="muted" />
-            <ScoreRow label="Bracket Reset" note="Groups lock at the first match; the knockout locks at the Round of 32" pts="⏱" tone="muted" />
+            {MATCH_PICKS_ENABLED && <ScoreRow first label="Match Picks" note="Each pick locks at that match&rsquo;s kickoff" pts="⏱" tone="muted" />}
+            <ScoreRow first={!MATCH_PICKS_ENABLED} label={BRACKET_RESET_ENABLED ? 'Up-Front Pick’em' : 'Bracket'} note="The whole bracket locks at the first match" pts="⏱" tone="muted" />
+            {BRACKET_RESET_ENABLED && <ScoreRow label="Bracket Reset" note="Groups lock at the first match; the knockout locks at the Round of 32" pts="⏱" tone="muted" />}
           </Card>
           <p style={{ fontFamily: 'var(--f-body)', fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.55, marginTop: 12 }}>
             Once something locks it&rsquo;s final, so get your predictions in early. Points appear automatically as
@@ -269,8 +290,8 @@ export default function HowToPlayPage() {
 
         {/* ── CTAs ────────────────────────────────────────────────── */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: '30px 20px 0' }}>
-          <Link href="/picks" style={ctaPrimary}>Make your picks →</Link>
-          <Link href="/bracket" style={ctaSecondary}>Fill your bracket</Link>
+          {MATCH_PICKS_ENABLED && <Link href="/picks" style={ctaPrimary}>Make your picks →</Link>}
+          <Link href="/bracket" style={MATCH_PICKS_ENABLED ? ctaSecondary : ctaPrimary}>Fill your bracket →</Link>
         </div>
       </div>
     </AppShell>

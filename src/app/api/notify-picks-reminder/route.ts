@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase-server'
 import { isCronOrAdmin } from '@/lib/api-auth'
+import { MATCH_PICKS_ENABLED } from '@/lib/features'
 import { Resend } from 'resend'
 import { formatKickoff } from '@/lib/utils'
 import { addHours } from 'date-fns'
@@ -11,6 +12,10 @@ import { addHours } from 'date-fns'
 async function handler(req: NextRequest) {
   if (!(await isCronOrAdmin(req))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  // Match Picks is hidden for now — skip "make your picks" reminders entirely.
+  if (!MATCH_PICKS_ENABLED) {
+    return NextResponse.json({ message: 'Match Picks disabled — no reminders sent', sent: 0 })
   }
   const resend = new Resend(process.env.RESEND_API_KEY)
   const FROM = process.env.RESEND_FROM_EMAIL!

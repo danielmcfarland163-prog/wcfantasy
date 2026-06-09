@@ -225,6 +225,18 @@ export const BRACKET_MODES: { key: BracketMode; label: string; blurb: string }[]
   { key: 'reset',  label: 'Bracket Reset',          blurb: 'Knockout re-opens from the real R32 after groups · locks Jun 28' },
 ]
 
+// Feature flag — Bracket Reset is hidden from the UI for now (may ship later).
+// Flip to `true` to re-expose the /bracket mode toggle, the player-summary panel,
+// and the How-to-Play section. The backend (scoring, bracket_entries.mode, the
+// migrations) is intentionally left intact, so re-enabling is a UI-only change.
+export const BRACKET_RESET_ENABLED = false
+
+// Bracket modes actually offered in the UI right now (respects the flag above).
+// When Reset is hidden this collapses to just Up-Front Pick'em.
+export const ACTIVE_BRACKET_MODES = BRACKET_MODES.filter(
+  (m) => BRACKET_RESET_ENABLED || m.key === 'pickem',
+)
+
 // Is the knockout portion of this mode available to fill yet?
 //   pickem → as soon as the player's own group picks are complete (self-seeded).
 //   reset  → only once the real group stage is over (actual R32 known).

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
+import { MATCH_PICKS_ENABLED } from '@/lib/features'
 import { useState } from 'react'
 
 const NAV_LINKS = [
@@ -10,7 +11,7 @@ const NAV_LINKS = [
   { href: '/bracket',     label: 'Bracket' },
   { href: '/live',        label: 'Live' },
   { href: '/stats',       label: 'Stats' },
-  { href: '/picks',       label: 'Picks' },
+  ...(MATCH_PICKS_ENABLED ? [{ href: '/picks', label: 'Picks' }] : []),
   { href: '/leagues',     label: 'Leagues' },
 ]
 

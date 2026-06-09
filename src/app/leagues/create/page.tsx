@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { MATCH_PICKS_ENABLED } from '@/lib/features'
 
 type GameMode = 'picks' | 'bracket' | 'both' | 'combined'
 
@@ -18,7 +19,8 @@ export default function CreateLeaguePage() {
   const router = useRouter()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [gameMode, setGameMode] = useState<GameMode>('both')
+  // Match Picks hidden for now — new leagues are Bracket-only.
+  const [gameMode, setGameMode] = useState<GameMode>(MATCH_PICKS_ENABLED ? 'both' : 'bracket')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -84,6 +86,7 @@ export default function CreateLeaguePage() {
                 placeholder="May the best picker win" maxLength={100} className="input" />
             </div>
 
+            {MATCH_PICKS_ENABLED && (
             <div>
               <label style={{ display: 'block', fontFamily: 'var(--f-mono)', fontSize: 10, letterSpacing: 0.8, color: 'var(--ink-3)', marginBottom: 10 }}>
                 GAME MODE
@@ -102,6 +105,7 @@ export default function CreateLeaguePage() {
                 })}
               </div>
             </div>
+            )}
 
             {error && (
               <p style={{ fontFamily: 'var(--f-body)', fontSize: 13, color: 'var(--live)', background: 'color-mix(in srgb, var(--live) 8%, transparent)', borderRadius: 10, padding: '10px 12px' }}>

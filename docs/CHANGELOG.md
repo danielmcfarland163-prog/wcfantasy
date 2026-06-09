@@ -4,6 +4,15 @@
 
 ## Unreleased
 
+### Feature flags: Up-Front Pick'em only — hide Match Picks + Bracket Reset (2026-06-08)
+
+- **What.** The app now surfaces a single game, **Up-Front Pick'em**. The **Match Picks** (scoreline) game and the **Bracket Reset** mode are hidden behind feature flags. Backends (scoring RPCs, routes, DB columns) are left intact, so re-enabling is a one-line flip.
+- **Flags.** `lib/features.ts` → `MATCH_PICKS_ENABLED = false`; `lib/bracket.ts` → `BRACKET_RESET_ENABLED = false` (drives `ACTIVE_BRACKET_MODES`).
+- **Bracket Reset hidden.** `/bracket` mode toggle collapses to Pick'em only (no toggle shown); the player-summary "Bracket Reset" panel and the How-to-Play Mode B card are gated off. (Earlier same-day fix to the reset summary recap is now moot while hidden but preserved.)
+- **Match Picks hidden.** Removed from `Nav` / `SideNav` / `BottomNav`; `/picks` redirects to `/bracket`; league standings drop the **Picks** column and rank by bracket; the player summary drops the Picks stat + Match Picks tab (bracket shown on its own); `/stats` shows the **Brackets** leaderboard only (mode switcher hidden); How-to-Play drops the Match Picks game and reads as a single-game guide.
+- **Scoring untouched.** `score_picks()` / `scoreBrackets()` and all `*_points` columns are unchanged; the visible standings/summary totals are computed bracket-only client-side. Note: the global mini-leaderboard on `/today` still reads `global_scores.total_points` (≈ bracket while no picks exist) — flag a follow-up if a fully bracket-only global rank is wanted.
+- **Re-enable.** Set the relevant flag back to `true`.
+
 ### Fix: Bracket Reset summary re-listed group/3rd recaps (2026-06-08)
 
 - **Symptom.** On `/bracket` in **Bracket Reset** mode, the Summary tab re-listed the full **Group Stage Picks** grid and **3rd-Place Qualifiers** chips — the same up-front predictions already entered on the Groups / 3rd tabs — so the reset view read like the whole bracket instead of the knockout it re-seeds from the real R32.
