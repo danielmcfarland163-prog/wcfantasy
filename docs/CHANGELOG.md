@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+### Group picks scored position-agnostically — 1st/2nd swap counts (2026-06-08)
+
+- **What.** A group pick now scores whenever that team finishes in the actual **top two** of its group, even if you had 1st and 2nd swapped. Each correct top-two team is worth 2 pts (4 per group max) — totals and the 231 perfect bracket are unchanged, scoring is just order-tolerant now.
+- **Engine.** `lib/bracket-scoring.ts` `scoreBracketEntry` group loop now checks set membership against `{first, second}` (de-duped, so a stray duplicate pick can't score the same team twice). New exported **`groupPickHit(pick, groupResult)`** is the single source of truth for the ✓/✗ chips.
+- **UI.** Group correctness badges in `BracketClient` (Groups tab + Summary) and `BracketReviewer` now use `groupPickHit`, so the chips always match the points. How-to-Play group scoring line updated ("1st or 2nd, either order").
+- **Tests.** Added swap / wrong-slot / duplicate cases to `bracket-scoring.test.ts`; existing exact-match cases still pass (they're a subset). No DB/scoring-RPC change — bracket scoring is JS-only.
+
 ### Feature flags: Up-Front Pick'em only — hide Match Picks + Bracket Reset (2026-06-08)
 
 - **What.** The app now surfaces a single game, **Up-Front Pick'em**. The **Match Picks** (scoreline) game and the **Bracket Reset** mode are hidden behind feature flags. Backends (scoring RPCs, routes, DB columns) are left intact, so re-enabling is a one-line flip.

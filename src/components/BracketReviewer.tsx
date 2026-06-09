@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { dbToState, GROUP_KEYS, teamByName } from '@/lib/bracket'
-import { scoreBracketEntry, knockoutPickCorrect, BRACKET_PTS } from '@/lib/bracket-scoring'
+import { scoreBracketEntry, knockoutPickCorrect, BRACKET_PTS, groupPickHit } from '@/lib/bracket-scoring'
 import type { BracketEntry } from '@/lib/types'
 
 interface TournamentResults {
@@ -91,12 +91,13 @@ export default function BracketReviewer({ entries, currentUserId, tournamentResu
   )
 }
 
-function ResultBadge({ pick, actual }: { pick: string | null | undefined; actual: string | null | undefined }) {
-  if (!actual || !pick) return null
-  const correct = pick === actual
+function ResultBadge({ pick, group }: { pick: string | null | undefined; group: { first?: string | null; second?: string | null } | null | undefined }) {
+  // Swap-tolerant: a group pick is correct if the team is in the actual top two.
+  const hit = groupPickHit(pick, group)
+  if (hit === null) return null
   return (
-    <span style={{ fontFamily:'var(--f-mono)', fontSize:10, fontWeight:800, color: correct ? 'var(--win)' : 'var(--live)', flexShrink:0 }}>
-      {correct ? '✓' : '✗'}
+    <span style={{ fontFamily:'var(--f-mono)', fontSize:10, fontWeight:800, color: hit ? 'var(--win)' : 'var(--live)', flexShrink:0 }}>
+      {hit ? '✓' : '✗'}
     </span>
   )
 }
@@ -181,7 +182,7 @@ export function BracketDetail({ entry, results }: { entry: BracketEntry; results
                         <span style={{ width:14, height:13, borderRadius:3, background:'var(--gold)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--f-mono)', fontSize:7, fontWeight:700, color:'#fff', flexShrink:0 }}>1</span>
                         <span style={{ fontSize:12 }}>{t1.f}</span>
                         <span style={{ fontFamily:'var(--f-body)', fontWeight:600, fontSize:11, color:'var(--ink)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t1.n}</span>
-                        <ResultBadge pick={p.first} actual={actual?.first} />
+                        <ResultBadge pick={p.first} group={actual} />
                       </div>
                     )}
                     {t2 && (
@@ -189,7 +190,7 @@ export function BracketDetail({ entry, results }: { entry: BracketEntry; results
                         <span style={{ width:14, height:13, borderRadius:3, background:'var(--surface-2)', border:'1px solid var(--line)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--f-mono)', fontSize:7, fontWeight:700, color:'var(--ink-3)', flexShrink:0 }}>2</span>
                         <span style={{ fontSize:12 }}>{t2.f}</span>
                         <span style={{ fontFamily:'var(--f-body)', fontWeight:600, fontSize:11, color:'var(--ink)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t2.n}</span>
-                        <ResultBadge pick={p.second} actual={actual?.second} />
+                        <ResultBadge pick={p.second} group={actual} />
                       </div>
                     )}
                   </div>

@@ -34,6 +34,30 @@ describe('scoreBracketEntry', () => {
     expect(firstOnly.points).toBe(2)
   })
 
+  it('scores group picks position-agnostically (1st/2nd swap still counts)', () => {
+    // Picked the right two teams but with 1st/2nd swapped — both still score.
+    const swapped = scoreBracketEntry(
+      { group_picks: { A: { first: 'SRB', second: 'BRA' } } },
+      { group_results: { A: { first: 'BRA', second: 'SRB', third: 'CMR' } } },
+    )
+    expect(swapped.points).toBe(4)
+    expect(swapped.correct).toBe(2)
+
+    // One correct team in the wrong slot still scores its 2.
+    const oneHit = scoreBracketEntry(
+      { group_picks: { A: { first: 'ZZZ', second: 'BRA' } } },
+      { group_results: { A: { first: 'BRA', second: 'SRB' } } },
+    )
+    expect(oneHit.points).toBe(2)
+
+    // A duplicated pick can't score twice for one team.
+    const dup = scoreBracketEntry(
+      { group_picks: { A: { first: 'BRA', second: 'BRA' } } },
+      { group_results: { A: { first: 'BRA', second: 'SRB' } } },
+    )
+    expect(dup.points).toBe(2)
+  })
+
   it('scores 3rd-place qualifiers by membership (order-independent)', () => {
     const r = scoreBracketEntry({ third_quals: ['A', 'B', 'C'] }, { third_quals: ['C', 'A', 'X'] })
     expect(r.points).toBe(4) // A and C correct → 2 × 2

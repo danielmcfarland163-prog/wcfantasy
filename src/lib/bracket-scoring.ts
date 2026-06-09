@@ -109,13 +109,20 @@ export function scoreBracketEntry(
   const groupKeys = Object.keys(gr)
 
   // ── Group stage (1st + 2nd) ──
+  // Position-agnostic: each of the user's two group picks scores if that team is in
+  // the actual top two — a swapped 1st/2nd still counts. Both slots are worth the
+  // same (BRACKET_PTS.group1st === group2nd === 2), so order never matters.
   let group1st = 0
   let group2nd = 0
   for (const gk of groupKeys) {
     const actual = gr[gk]
     if (!actual) continue
-    if (actual.first && gp[gk]?.first === actual.first) group1st++
-    if (actual.second && gp[gk]?.second === actual.second) group2nd++
+    const top2 = [actual.first, actual.second].filter((t): t is string => !!t)
+    if (top2.length === 0) continue
+    const myFirst = gp[gk]?.first
+    const mySecond = gp[gk]?.second
+    if (myFirst && top2.includes(myFirst)) group1st++
+    if (mySecond && mySecond !== myFirst && top2.includes(mySecond)) group2nd++
   }
   const groupsHasResults = groupKeys.length > 0
   const groupsCorrect = group1st + group2nd
@@ -229,4 +236,19 @@ export function knockoutPickCorrect(
     return a.length > 0 && a.every(Boolean) ? false : null
   }
   return a[slot] ? nm === a[slot] : null
+}
+
+/**
+ * Whether a single group pick (1st or 2nd slot) renders correct (✓), wrong (✗) or
+ * undecided (null). Position-agnostic: a pick is correct if that team finished in
+ * the actual top two of its group, regardless of which slot the user placed it in.
+ * Mirrors the swap-tolerant scoring in scoreBracketEntry so the chips never drift.
+ */
+export function groupPickHit(
+  pick: string | null | undefined,
+  groupResult: { first?: string | null; second?: string | null } | null | undefined,
+): boolean | null {
+  const top2 = [groupResult?.first, groupResult?.second].filter((t): t is string => !!t)
+  if (top2.length === 0 || !pick) return null
+  return top2.includes(pick)
 }

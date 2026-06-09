@@ -15,7 +15,7 @@ import {
   pickGroupPickem, pickThirdPickem, survivorComplete,
   survivorCandidates, survivorPicks, toggleSurvivor, SURVIVOR_COUNTS, type SurvivorRound,
 } from '@/lib/bracket'
-import { scoreBracketEntry, BRACKET_PTS, knockoutPickCorrect } from '@/lib/bracket-scoring'
+import { scoreBracketEntry, BRACKET_PTS, knockoutPickCorrect, groupPickHit } from '@/lib/bracket-scoring'
 
 const fmtLock = (d: Date) =>
   d.toLocaleString('en-GB', {
@@ -266,9 +266,9 @@ function GroupsTab({ state, mode, locked, onUpdate, onNext, results }: { state:B
                       {is1?'1ST':is2?'2ND':'·'}
                     </span>
                     {(is1 || is2) && results?.group_results[gk]?.first && (() => {
-                      const actual = results.group_results[gk]
-                      const correct = (is1 && p.first === actual.first) || (is2 && p.second === actual.second)
-                      return <span style={{ fontFamily:'var(--f-mono)', fontWeight:800, fontSize:12, color: correct ? 'var(--win)' : 'var(--live)', flexShrink:0 }}>{correct ? '✓' : '✗'}</span>
+                      // Swap-tolerant: this team scores if it's in the actual top two.
+                      const hit = groupPickHit(is1 ? p.first : p.second, results.group_results[gk])
+                      return <span style={{ fontFamily:'var(--f-mono)', fontWeight:800, fontSize:12, color: hit ? 'var(--win)' : 'var(--live)', flexShrink:0 }}>{hit ? '✓' : '✗'}</span>
                     })()}
                   </button>
                 )
@@ -681,10 +681,11 @@ function SurvivorTab({ state, locked, bracketOpen, onUpdate, onComplete, results
 
 // ── SUMMARY TAB ────────────────────────────────────────────────────────────────
 
-function ResultBadge({ pick, actual }: { pick: string | null | undefined; actual: string | null | undefined }) {
-  if (!actual) return null
+function ResultBadge({ pick, group }: { pick: string | null | undefined; group: { first?: string | null; second?: string | null } | null | undefined }) {
+  const hasResult = !!(group?.first || group?.second)
+  if (!hasResult) return null
   if (!pick) return <span style={{ fontFamily:'var(--f-mono)', fontSize:9, fontWeight:700, color:'var(--ink-3)' }}>—</span>
-  const correct = pick === actual
+  const correct = groupPickHit(pick, group)
   return (
     <span style={{ fontFamily:'var(--f-mono)', fontSize:10, fontWeight:800, color: correct ? 'var(--win)' : 'var(--live)', flexShrink:0 }}>
       {correct ? '✓' : '✗'}
@@ -865,7 +866,7 @@ function SummaryTab({ state, mode, onGoTo, results, groupLocked, bracketLocked, 
                       <span style={{ width:18, height:16, borderRadius:4, background:'var(--gold)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--f-mono)', fontSize:8, fontWeight:700, color:'#fff', flexShrink:0 }}>1</span>
                       <span style={{ fontSize:14 }}>{t1.f}</span>
                       <span style={{ fontFamily:'var(--f-body)', fontWeight:600, fontSize:12, color:'var(--ink)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{t1.n}</span>
-                      <ResultBadge pick={p.first} actual={actual?.first} />
+                      <ResultBadge pick={p.first} group={actual} />
                     </div>
                   )}
                   {t2 && (
@@ -873,7 +874,7 @@ function SummaryTab({ state, mode, onGoTo, results, groupLocked, bracketLocked, 
                       <span style={{ width:18, height:16, borderRadius:4, background:'var(--surface-2)', border:'1px solid var(--line)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--f-mono)', fontSize:8, fontWeight:700, color:'var(--ink-3)', flexShrink:0 }}>2</span>
                       <span style={{ fontSize:14 }}>{t2.f}</span>
                       <span style={{ fontFamily:'var(--f-body)', fontWeight:600, fontSize:12, color:'var(--ink)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{t2.n}</span>
-                      <ResultBadge pick={p.second} actual={actual?.second} />
+                      <ResultBadge pick={p.second} group={actual} />
                     </div>
                   )}
                 </div>

@@ -204,8 +204,7 @@ export default function HowToPlayPage() {
 
           <Card>
             <div className="wc-section-head" style={{ marginBottom: 4 }}>Scoring · per correct pick</div>
-            <ScoreRow first label="Group winner (1st)" pts={2} tone="accent" />
-            <ScoreRow label="Group runner-up (2nd)" pts={2} tone="accent" />
+            <ScoreRow first label="Group top two (each team)" note="2 pts per correct top-two team — 1st or 2nd, either order" pts={2} tone="accent" />
             <ScoreRow label="Third-place qualifier" pts={2} tone="accent" />
             <ScoreRow label="Round of 32 winner" pts={3} tone="accent" />
             <ScoreRow label="Round of 16 winner" pts={5} tone="win" />
