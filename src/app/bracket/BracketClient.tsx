@@ -333,7 +333,7 @@ function ThirdTab({ state, mode, locked, onUpdate, onNext, onToast, results }: {
                   border: `1px solid ${correct === true ? 'color-mix(in srgb,var(--win) 30%,var(--line))' : correct === false ? 'color-mix(in srgb,var(--live) 25%,var(--line))' : 'color-mix(in srgb,var(--win) 25%,var(--line))'}`,
                   fontFamily:'var(--f-body)', fontSize:13, fontWeight:600, color:'var(--ink)' }}>
                   <span style={{ color:'var(--ink-3)', fontFamily:'var(--f-mono)', fontSize:9 }}>#{i+1}</span>
-                  <span>{t.f}</span><span>{nm}</span>
+                  <Flag iso={isoForTeam(t.c)} size={16} radius={4} ring={false} alt={t.n} /><span>{nm}</span>
                   {correct !== null && <span style={{ fontFamily:'var(--f-mono)', fontSize:11, fontWeight:800, color: correct ? 'var(--win)' : 'var(--live)' }}>{correct ? '✓' : '✗'}</span>}
                 </span>
               )
@@ -365,7 +365,7 @@ function ThirdTab({ state, mode, locked, onUpdate, onNext, onToast, results }: {
                 return (
                   <button key={tm.n} disabled={locked} onClick={() => handlePick(gk, tm.n)}
                     style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 12px', textAlign:'left', border:'none', borderTop:idx>0?'1px solid var(--line)':'none', background:isQual?'color-mix(in srgb,var(--win) 7%,var(--surface))':isCur?'color-mix(in srgb,var(--accent) 6%,var(--surface))':'var(--surface)', cursor:locked?'default':'pointer' }}>
-                    <span style={{ fontSize:20 }}>{tm.f}</span>
+                    <Flag iso={isoForTeam(tm.c)} size={22} radius={5} ring={false} alt={tm.n} />
                     <span style={{ flex:1, fontFamily:'var(--f-body)', fontWeight:600, fontSize:13, color:'var(--ink)' }}>{tm.n}</span>
                     {isCur && (
                       results?.third_quals?.length
@@ -480,7 +480,7 @@ function BracketTab({ state, mode, locked, bracketOpen, onUpdate, onComplete, re
 
       {state.final && (
         <div style={{ padding:'24px 20px', background:'linear-gradient(135deg,color-mix(in srgb,var(--gold) 12%,var(--surface)),color-mix(in srgb,var(--gold) 4%,var(--surface)))', border:'1.5px solid color-mix(in srgb,var(--gold) 35%,var(--line))', borderRadius:20, textAlign:'center' }}>
-          <div style={{ fontSize:52, marginBottom:8 }}>{teamByName(state.final).f}</div>
+          <div style={{ display:'flex', justifyContent:'center', marginBottom:8 }}><Flag iso={isoForTeam(teamByName(state.final).c)} size={56} radius={10} ring={false} alt={state.final} /></div>
           <div style={{ fontFamily:'var(--f-mono)', fontSize:10, letterSpacing:'2px', color:'var(--gold)', fontWeight:700, marginBottom:6 }}>YOUR 2026 CHAMPION</div>
           <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:28, color:'var(--ink)' }}>{state.final}</div>
           {!locked && (
@@ -649,7 +649,7 @@ function SurvivorTab({ state, locked, bracketOpen, onUpdate, onComplete, results
                           border:`${on && verdict===null ? '1.5px' : '1px'} solid ${bd}`, background:bg, color:fg,
                           cursor:disabled?'default':'pointer', opacity: disabled && !on ? 0.4 : 1,
                           fontFamily:'var(--f-body)', fontWeight:600, fontSize:13, transition:'all .12s' }}>
-                        <span style={{ fontSize:15 }}>{t.f}</span>
+                        <Flag iso={isoForTeam(t.c)} size={18} radius={4} ring={false} alt={t.n} />
                         <span>{nm}</span>
                         {verdict===true && <span style={{ fontFamily:'var(--f-mono)', fontSize:11, fontWeight:800 }}>✓</span>}
                         {verdict===false && <span style={{ fontFamily:'var(--f-mono)', fontSize:11, fontWeight:800 }}>✗</span>}
@@ -665,7 +665,7 @@ function SurvivorTab({ state, locked, bracketOpen, onUpdate, onComplete, results
 
       {state.final && (
         <div style={{ marginTop:18, padding:'24px 20px', background:'linear-gradient(135deg,color-mix(in srgb,var(--gold) 12%,var(--surface)),color-mix(in srgb,var(--gold) 4%,var(--surface)))', border:'1.5px solid color-mix(in srgb,var(--gold) 35%,var(--line))', borderRadius:20, textAlign:'center' }}>
-          <div style={{ fontSize:52, marginBottom:8 }}>{teamByName(state.final).f}</div>
+          <div style={{ display:'flex', justifyContent:'center', marginBottom:8 }}><Flag iso={isoForTeam(teamByName(state.final).c)} size={56} radius={10} ring={false} alt={state.final} /></div>
           <div style={{ fontFamily:'var(--f-mono)', fontSize:10, letterSpacing:'2px', color:'var(--gold)', fontWeight:700, marginBottom:6 }}>YOUR CHAMPION</div>
           <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:28, color:'var(--ink)' }}>{state.final}</div>
           {!locked && (
@@ -864,7 +864,7 @@ function SummaryTab({ state, mode, onGoTo, results, groupLocked, bracketLocked, 
                   {t1 && (
                     <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
                       <span style={{ width:18, height:16, borderRadius:4, background:'var(--gold)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--f-mono)', fontSize:8, fontWeight:700, color:'#fff', flexShrink:0 }}>1</span>
-                      <span style={{ fontSize:14 }}>{t1.f}</span>
+                      <Flag iso={isoForTeam(t1.c)} size={16} radius={4} ring={false} alt={t1.n} />
                       <span style={{ fontFamily:'var(--f-body)', fontWeight:600, fontSize:12, color:'var(--ink)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{t1.n}</span>
                       <ResultBadge pick={p.first} group={actual} />
                     </div>
@@ -872,7 +872,7 @@ function SummaryTab({ state, mode, onGoTo, results, groupLocked, bracketLocked, 
                   {t2 && (
                     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                       <span style={{ width:18, height:16, borderRadius:4, background:'var(--surface-2)', border:'1px solid var(--line)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--f-mono)', fontSize:8, fontWeight:700, color:'var(--ink-3)', flexShrink:0 }}>2</span>
-                      <span style={{ fontSize:14 }}>{t2.f}</span>
+                      <Flag iso={isoForTeam(t2.c)} size={16} radius={4} ring={false} alt={t2.n} />
                       <span style={{ fontFamily:'var(--f-body)', fontWeight:600, fontSize:12, color:'var(--ink)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{t2.n}</span>
                       <ResultBadge pick={p.second} group={actual} />
                     </div>
@@ -901,7 +901,7 @@ function SummaryTab({ state, mode, onGoTo, results, groupLocked, bracketLocked, 
                   border: `1px solid ${correct === true ? 'color-mix(in srgb,var(--win) 30%,var(--line))' : correct === false ? 'color-mix(in srgb,var(--live) 25%,var(--line))' : 'color-mix(in srgb,var(--win) 22%,var(--line))'}`,
                   fontFamily:'var(--f-body)', fontSize:12, fontWeight:600, color:'var(--ink)' }}>
                   <span style={{ fontFamily:'var(--f-mono)', fontSize:9, color:'var(--ink-3)' }}>#{i+1}</span>
-                  {t.f} {nm}
+                  <Flag iso={isoForTeam(t.c)} size={14} radius={3} ring={false} alt={t.n} /> {nm}
                   {correct !== null && <span style={{ fontFamily:'var(--f-mono)', fontSize:10, fontWeight:800, color: correct ? 'var(--win)' : 'var(--live)' }}>{correct ? '✓' : '✗'}</span>}
                 </span>
               )
@@ -941,7 +941,7 @@ function SummaryTab({ state, mode, onGoTo, results, groupLocked, bracketLocked, 
                           background: isCorrect === true ? 'color-mix(in srgb,var(--win) 10%,var(--surface-2))' : isCorrect === false ? 'color-mix(in srgb,var(--live) 8%,var(--surface-2))' : 'var(--surface-2)',
                           border: `1px solid ${isCorrect === true ? 'color-mix(in srgb,var(--win) 30%,var(--line))' : isCorrect === false ? 'color-mix(in srgb,var(--live) 25%,var(--line))' : 'var(--line)'}`,
                           fontFamily:'var(--f-body)', fontSize:12, fontWeight:600, color:'var(--ink)' }}>
-                          {t.f} {nm}
+                          <Flag iso={isoForTeam(t.c)} size={14} radius={3} ring={false} alt={t.n} /> {nm}
                           {isCorrect !== null && <span style={{ fontFamily:'var(--f-mono)', fontSize:10, fontWeight:800, color: isCorrect ? 'var(--win)' : 'var(--live)' }}>{isCorrect ? '✓' : '✗'}</span>}
                         </span>
                       )
@@ -962,11 +962,11 @@ function SummaryTab({ state, mode, onGoTo, results, groupLocked, bracketLocked, 
             background: isCorrect === true ? 'linear-gradient(135deg,color-mix(in srgb,var(--win) 18%,var(--surface)),color-mix(in srgb,var(--win) 6%,var(--surface)))' : 'linear-gradient(135deg,color-mix(in srgb,var(--gold) 14%,var(--surface)),color-mix(in srgb,var(--gold) 5%,var(--surface)))',
             border: `1.5px solid ${isCorrect === true ? 'color-mix(in srgb,var(--win) 40%,var(--line))' : 'color-mix(in srgb,var(--gold) 35%,var(--line))'}`,
             borderRadius:20, textAlign:'center' }}>
-            <div style={{ fontSize:56, marginBottom:10 }}>{teamByName(state.final).f}</div>
+            <div style={{ display:'flex', justifyContent:'center', marginBottom:10 }}><Flag iso={isoForTeam(teamByName(state.final).c)} size={60} radius={12} ring={false} alt={state.final} /></div>
             {isCorrect === true && <div style={{ fontFamily:'var(--f-mono)', fontSize:11, fontWeight:800, color:'var(--win)', letterSpacing:'1.5px', marginBottom:6 }}>🏆 CORRECT · +{BRACKET_PTS.champion} PTS</div>}
             {isCorrect === false && results?.final_result && (
               <div style={{ fontFamily:'var(--f-mono)', fontSize:10, color:'var(--live)', fontWeight:700, marginBottom:6 }}>
-                ✗ Winner was {teamByName(results.final_result).f} {results.final_result}
+                ✗ Winner was <span style={{ display:'inline-flex', verticalAlign:'middle' }}><Flag iso={isoForTeam(teamByName(results.final_result).c)} size={12} radius={2} ring={false} alt={results.final_result} /></span> {results.final_result}
               </div>
             )}
             <div style={{ fontFamily:'var(--f-mono)', fontSize:10, letterSpacing:'2px', color: isCorrect === true ? 'var(--win)' : 'var(--gold)', fontWeight:700, marginBottom:4 }}>YOUR TOURNAMENT CHAMPION</div>

@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+### Real flags on the 3rd Place, Bracket & Summary tabs (2026-06-08)
+
+- **Why.** Those tabs rendered team flags as emoji (`team.f`), which don't display on Windows (they show as letter pairs/boxes). The Groups tab already used the `<Flag>` image component.
+- **What.** On the My Bracket page (`BracketClient`), swapped every emoji flag for `<Flag iso={isoForTeam(team.c)} …>` — the 3rd-place qualifier chips + candidate rows, the survivor pool team chips, the knockout/group recap chips on the Summary tab, and the champion crests (and the "winner was" line). Sizes mirror each spot's old emoji; Groups and Standings were already on `<Flag>`.
+
 ### Group picks scored position-agnostically — 1st/2nd swap counts (2026-06-08)
 
 - **What.** A group pick now scores whenever that team finishes in the actual **top two** of its group, even if you had 1st and 2nd swapped. Each correct top-two team is worth 2 pts (4 per group max) — totals and the 231 perfect bracket are unchanged, scoring is just order-tolerant now.
