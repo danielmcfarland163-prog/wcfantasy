@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { dbToState, GROUP_KEYS, teamByName } from '@/lib/bracket'
-import { scoreBracketEntry, BRACKET_PTS } from '@/lib/bracket-scoring'
+import { scoreBracketEntry, knockoutPickCorrect, BRACKET_PTS } from '@/lib/bracket-scoring'
 import type { BracketEntry } from '@/lib/types'
 
 interface TournamentResults {
@@ -51,8 +51,8 @@ export default function BracketReviewer({ entries, currentUserId, tournamentResu
           const state = dbToState(entry as any)
           const hasChampion = !!state.final
 
-          // Score summary via the shared engine (identical to the server)
-          const sc = tournamentResults ? scoreBracketEntry(entry as any, tournamentResults as any) : null
+          // Score summary via the shared engine (identical to the server), mode-aware.
+          const sc = tournamentResults ? scoreBracketEntry(entry as any, tournamentResults as any, entry.mode === 'pickem' ? 'pickem' : 'reset') : null
 
           return (
             <button
@@ -103,20 +103,21 @@ function ResultBadge({ pick, actual }: { pick: string | null | undefined; actual
 
 export function BracketDetail({ entry, results }: { entry: BracketEntry; results?: TournamentResults | null }) {
   const state = dbToState(entry as any)
+  const isPickem = entry.mode === 'pickem'
   const name = entry.profile?.display_name ?? entry.profile?.username ?? 'Unknown'
   const bracketPicks = [...state.r32, ...state.r16, ...state.qf, ...state.sf, state.final].filter(Boolean).length
   const hasResults = !!results
 
-  const groupCorrect = hasResults ? GROUP_KEYS.reduce((acc, gk) => {
-    if (state.gp[gk]?.first  === results!.group_results[gk]?.first)  acc++
-    if (state.gp[gk]?.second === results!.group_results[gk]?.second) acc++
-    return acc
-  }, 0) : 0
-  const thirdCorrect = hasResults ? state.tq.filter(nm => results!.third_quals.includes(nm)).length : 0
-  const r32Correct   = hasResults ? state.r32.filter((p,i) => p && p === results!.r32_results[i]).length : 0
-  const r16Correct   = hasResults ? state.r16.filter((p,i) => p && p === results!.r16_results[i]).length : 0
-  const qfCorrect    = hasResults ? state.qf.filter((p,i)  => p && p === results!.qf_results[i]).length  : 0
-  const sfCorrect    = hasResults ? state.sf.filter((p,i)  => p && p === results!.sf_results[i]).length  : 0
+  // Mode-aware counts straight from the shared scoring breakdown (pickem = survivor
+  // set-membership, reset = bracket position) so they match the points exactly.
+  const sc = hasResults ? scoreBracketEntry(entry as any, results as any, isPickem ? 'pickem' : 'reset') : null
+  const bd = (k: string) => sc?.breakdown.find(r => r.key === k)
+  const groupCorrect = bd('groups')?.correct ?? 0
+  const thirdCorrect = bd('third')?.correct ?? 0
+  const r32Correct   = bd('r32')?.correct ?? 0
+  const r16Correct   = bd('r16')?.correct ?? 0
+  const qfCorrect    = bd('qf')?.correct ?? 0
+  const sfCorrect    = bd('sf')?.correct ?? 0
 
   return (
     <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:20, overflow:'hidden' }}>
@@ -232,10 +233,10 @@ export function BracketDetail({ entry, results }: { entry: BracketEntry; results
             </div>
             <div style={{ padding:'12px 14px', display:'flex', flexDirection:'column', gap:12 }}>
               {[
-                { label:'R32', picks:state.r32, actuals:results?.r32_results, correct:r32Correct, total:16 },
-                { label:'R16', picks:state.r16, actuals:results?.r16_results, correct:r16Correct, total:8 },
-                { label:'QF',  picks:state.qf,  actuals:results?.qf_results,  correct:qfCorrect,  total:4 },
-                { label:'SF',  picks:state.sf,  actuals:results?.sf_results,  correct:sfCorrect,  total:2 },
+                { label: isPickem?'R16':'R32', picks:state.r32, actuals:results?.r32_results, correct:r32Correct, total:16 },
+                { label: isPickem?'QF':'R16',  picks:state.r16, actuals:results?.r16_results, correct:r16Correct, total:8 },
+                { label: isPickem?'SF':'QF',   picks:state.qf,  actuals:results?.qf_results,  correct:qfCorrect,  total:4 },
+                { label: isPickem?'F':'SF',    picks:state.sf,  actuals:results?.sf_results,  correct:sfCorrect,  total:2 },
               ].map(({ label, picks, actuals, correct, total }) => {
                 const made = picks.map((p, i) => ({ nm: p, i })).filter(x => x.nm)
                 if (!made.length) return null
@@ -248,7 +249,7 @@ export function BracketDetail({ entry, results }: { entry: BracketEntry; results
                     <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
                       {made.map(({ nm, i }) => {
                         const t = teamByName(nm!)
-                        const isCorrect = actuals ? (nm === actuals[i] ? true : actuals[i] ? false : null) : null
+                        const isCorrect = knockoutPickCorrect(nm!, i, actuals, isPickem)
                         return (
                           <span key={`${nm}-${i}`} style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 8px', borderRadius:12,
                             background: isCorrect === true ? 'color-mix(in srgb,var(--win) 10%,var(--surface-2))' : isCorrect === false ? 'color-mix(in srgb,var(--live) 8%,var(--surface-2))' : 'var(--surface-2)',

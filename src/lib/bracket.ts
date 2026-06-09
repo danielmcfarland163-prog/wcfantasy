@@ -262,6 +262,157 @@ export function getModeMatchTeams(
     : getKnockoutMatchTeams(state, results, round, i)
 }
 
+// ── PICK'EM SURVIVOR POOL ───────────────────────────────────────────────────────
+// Pick'em is a survivor pool, not a matchup bracket: you pick WHICH teams advance
+// each round, independent of who plays whom — so a missed group pick can never
+// cascade through a fixed bracket of matchups. Selection narrows your own pool:
+//   32 qualifiers → 16 (reach R16) → 8 (QF) → 4 (SF) → 2 (Final) → 1 champion.
+// Stored in the same r32/r16/qf/sf/final columns, but as SETS; scored by membership
+// (lib/bracket-scoring.ts, mode 'pickem').
+
+export type SurvivorRound = 'r32' | 'r16' | 'qf' | 'sf' | 'final'
+
+export const SURVIVOR_COUNTS: Record<SurvivorRound, number> = {
+  r32: 16, r16: 8, qf: 4, sf: 2, final: 1,
+}
+
+function compact(a: (string | null)[] | null | undefined): string[] {
+  return (a ?? []).filter(Boolean) as string[]
+}
+function padTo(a: string[], n: number): (string | null)[] {
+  const out: (string | null)[] = a.slice(0, n)
+  while (out.length < n) out.push(null)
+  return out
+}
+
+// The 32 teams a user has placed into the knockout: 1st + 2nd of all 12 groups plus
+// their 8 third-place qualifiers. De-duplicated, in a stable display order
+// (winners, then runners-up, then thirds).
+export function pool32(state: BracketState): string[] {
+  const firsts: string[] = []
+  const seconds: string[] = []
+  for (const gk of GROUP_KEYS) {
+    const p = state.gp[gk]
+    if (p?.first) firsts.push(p.first)
+    if (p?.second) seconds.push(p.second)
+  }
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const n of [...firsts, ...seconds, ...compact(state.tq)]) {
+    if (!seen.has(n)) { seen.add(n); out.push(n) }
+  }
+  return out
+}
+
+// Names a pickem round can be filled from: the previous round's chosen set
+// (r32 draws from the full pool of 32).
+export function survivorCandidates(state: BracketState, round: SurvivorRound): string[] {
+  switch (round) {
+    case 'r32': return pool32(state)
+    case 'r16': return compact(state.r32)
+    case 'qf':  return compact(state.r16)
+    case 'sf':  return compact(state.qf)
+    case 'final': return compact(state.sf)
+  }
+}
+
+export function survivorPicks(state: BracketState, round: SurvivorRound): string[] {
+  switch (round) {
+    case 'final': return state.final ? [state.final] : []
+    case 'r32': return compact(state.r32)
+    case 'r16': return compact(state.r16)
+    case 'qf':  return compact(state.qf)
+    case 'sf':  return compact(state.sf)
+  }
+}
+
+// Re-validate the survivor sets after any change: each round stays a subset of the
+// round above it (and the pool), capped at its count. Prunes invalid picks and
+// cascades the pruning downward — this is membership integrity, NOT a matchup
+// cascade. Swapping a group's 1st/2nd (same two teams) leaves every pick intact.
+export function prunePickemSurvivors(state: BracketState): BracketState {
+  const inPool = new Set(pool32(state))
+  const r32 = compact(state.r32).filter(n => inPool.has(n)).slice(0, SURVIVOR_COUNTS.r32)
+  const r32Set = new Set(r32)
+  const r16 = compact(state.r16).filter(n => r32Set.has(n)).slice(0, SURVIVOR_COUNTS.r16)
+  const r16Set = new Set(r16)
+  const qf = compact(state.qf).filter(n => r16Set.has(n)).slice(0, SURVIVOR_COUNTS.qf)
+  const qfSet = new Set(qf)
+  const sf = compact(state.sf).filter(n => qfSet.has(n)).slice(0, SURVIVOR_COUNTS.sf)
+  const sfSet = new Set(sf)
+  const final = state.final && sfSet.has(state.final) ? state.final : null
+  return {
+    ...state,
+    r32: padTo(r32, SURVIVOR_COUNTS.r32),
+    r16: padTo(r16, SURVIVOR_COUNTS.r16),
+    qf: padTo(qf, SURVIVOR_COUNTS.qf),
+    sf: padTo(sf, SURVIVOR_COUNTS.sf),
+    final,
+  }
+}
+
+// Toggle a team into / out of a pickem survivor round. Enforces the round's cap and
+// the subset rule; deselecting cascades the removal to deeper rounds. Final replaces.
+export function toggleSurvivor(state: BracketState, round: SurvivorRound, nm: string): BracketState {
+  const cap = SURVIVOR_COUNTS[round]
+  const cur = survivorPicks(state, round)
+  let next: string[]
+  if (cur.includes(nm)) next = cur.filter(x => x !== nm)
+  else if (cur.length < cap) next = [...cur, nm]
+  else if (cap === 1) next = [nm]
+  else return state // at cap, ignore
+
+  let s: BracketState
+  if (round === 'final') s = { ...state, final: next[0] ?? null }
+  else if (round === 'r32') s = { ...state, r32: padTo(next, cap) }
+  else if (round === 'r16') s = { ...state, r16: padTo(next, cap) }
+  else if (round === 'qf')  s = { ...state, qf: padTo(next, cap) }
+  else                      s = { ...state, sf: padTo(next, cap) }
+  return prunePickemSurvivors(s)
+}
+
+// A pickem bracket is complete only when every round is filled to its cap
+// (16 / 8 / 4 / 2 / 1) — reaching a champion via a thin chain is allowed but not
+// "done", so the UI keeps prompting for the remaining picks.
+export function survivorComplete(state: BracketState): boolean {
+  return compact(state.r32).length === SURVIVOR_COUNTS.r32
+    && compact(state.r16).length === SURVIVOR_COUNTS.r16
+    && compact(state.qf).length === SURVIVOR_COUNTS.qf
+    && compact(state.sf).length === SURVIVOR_COUNTS.sf
+    && !!state.final
+}
+
+// Pick'em group / 3rd-place handlers — same selection behaviour as pickGroup /
+// pickThird, but they re-validate the survivor sets instead of WIPING the knockout
+// (the matchup-seeded reset behaviour), so editing a group only drops picks that
+// genuinely left your pool of 32.
+export function pickGroupPickem(state: BracketState, gk: string, nm: string): BracketState {
+  const gp = { ...state.gp, [gk]: { ...(state.gp[gk] ?? { first: null, second: null }) } }
+  const p = gp[gk] as { first: string | null; second: string | null }
+  if (p.first === nm) { p.first = p.second ?? null; p.second = null }
+  else if (p.second === nm) { p.second = null }
+  else if (!p.first) p.first = nm
+  else if (!p.second) p.second = nm
+  else p.second = nm
+  return prunePickemSurvivors({ ...state, gp })
+}
+
+export function pickThirdPickem(state: BracketState, gk: string, nm: string): BracketState {
+  const tp = { ...state.tp }
+  let tq = [...state.tq]
+  const cur = tp[gk]
+  if (cur === nm) {
+    if (tq.includes(nm)) tq = tq.filter(x => x !== nm)
+    else if (tq.length < 8) tq.push(nm)
+    else return state
+  } else {
+    if (cur) tq = tq.filter(x => x !== cur)
+    tp[gk] = nm
+    if (tq.length < 8) tq.push(nm)
+  }
+  return prunePickemSurvivors({ ...state, tp, tq })
+}
+
 // ── TEAM HELPERS ──────────────────────────────────────────────────────────────
 
 export function teamByName(n: string): BracketTeam {

@@ -12,8 +12,10 @@ import {
   bracketModeOpen, isBracketModeLocked, reconcileKnockout,
   isGroupLocked,
   TOURNAMENT_LOCK, KNOCKOUT_LOCK,
+  pickGroupPickem, pickThirdPickem, survivorComplete,
+  survivorCandidates, survivorPicks, toggleSurvivor, SURVIVOR_COUNTS, type SurvivorRound,
 } from '@/lib/bracket'
-import { scoreBracketEntry, BRACKET_PTS } from '@/lib/bracket-scoring'
+import { scoreBracketEntry, BRACKET_PTS, knockoutPickCorrect } from '@/lib/bracket-scoring'
 
 const fmtLock = (d: Date) =>
   d.toLocaleString('en-GB', {
@@ -107,7 +109,8 @@ export default function BracketClient({ userId, mode, initialState, tournamentRe
 
   const groupsDone  = groupsComplete(state)
   const thirdDone   = thirdComplete(state)
-  const bracketDone = !!state.final
+  // pickem is a survivor pool — "done" means all 31 slots filled, not just a champion.
+  const bracketDone = isPickem ? survivorComplete(state) : !!state.final
   const doneCount   = GROUP_KEYS.filter(gk => state.gp[gk]?.first && state.gp[gk]?.second).length
   const bracketPicks = [...state.r32, ...state.r16, ...state.qf, ...state.sf, state.final].filter(Boolean).length
 
@@ -192,9 +195,11 @@ export default function BracketClient({ userId, mode, initialState, tournamentRe
         ))}
       </div>
 
-      {tab==='groups'  && <GroupsTab  state={state} locked={groupLocked} onUpdate={update} onNext={() => setTab('third')} results={tournamentResults} />}
-      {tab==='third'   && <ThirdTab   state={state} locked={groupLocked} onUpdate={update} onNext={() => setTab(bracketOpen ? 'bracket' : 'summary')} onToast={showToast} results={tournamentResults} />}
-      {tab==='bracket'  && <BracketTab state={state} mode={mode} locked={bracketLocked} bracketOpen={bracketOpen} onUpdate={update} onComplete={() => setTab('summary')} results={tournamentResults} />}
+      {tab==='groups'  && <GroupsTab  state={state} mode={mode} locked={groupLocked} onUpdate={update} onNext={() => setTab('third')} results={tournamentResults} />}
+      {tab==='third'   && <ThirdTab   state={state} mode={mode} locked={groupLocked} onUpdate={update} onNext={() => setTab(bracketOpen ? 'bracket' : 'summary')} onToast={showToast} results={tournamentResults} />}
+      {tab==='bracket'  && (isPickem
+        ? <SurvivorTab state={state} locked={bracketLocked} bracketOpen={bracketOpen} onUpdate={update} onComplete={() => setTab('summary')} results={tournamentResults} />
+        : <BracketTab  state={state} mode={mode} locked={bracketLocked} bracketOpen={bracketOpen} onUpdate={update} onComplete={() => setTab('summary')} results={tournamentResults} />)}
       {tab==='standings' && <StandingsTab results={tournamentResults ?? null} />}
       {tab==='summary'  && <SummaryTab state={state} mode={mode} onGoTo={setTab} results={tournamentResults ?? null} groupLocked={groupLocked} bracketLocked={bracketLocked} bracketOpen={bracketOpen} bracketLockLabel={bracketLockLabel} submitted={submitted} onSubmit={() => { setSubmitted(true); showToast(isPickem ? 'Bracket locked in — editable until kickoff' : 'Knockout bracket locked in — editable until kickoff') }} />}
 
@@ -209,7 +214,8 @@ export default function BracketClient({ userId, mode, initialState, tournamentRe
 
 // ── GROUPS TAB ─────────────────────────────────────────────────────────────────
 
-function GroupsTab({ state, locked, onUpdate, onNext, results }: { state:BracketState; locked:boolean; onUpdate:(s:BracketState)=>void; onNext:()=>void; results?: TournamentResults | null }) {
+function GroupsTab({ state, mode, locked, onUpdate, onNext, results }: { state:BracketState; mode:BracketMode; locked:boolean; onUpdate:(s:BracketState)=>void; onNext:()=>void; results?: TournamentResults | null }) {
+  const doGroupPick = mode === 'pickem' ? pickGroupPickem : pickGroup
   const groupsDone = groupsComplete(state)
   const doneCount = GROUP_KEYS.filter(gk => state.gp[gk]?.first && state.gp[gk]?.second).length
 
@@ -252,7 +258,7 @@ function GroupsTab({ state, locked, onUpdate, onNext, results }: { state:Bracket
               {grp.teams.map((tm, idx) => {
                 const is1 = p.first===tm.n, is2 = p.second===tm.n
                 return (
-                  <button key={tm.n} disabled={locked} onClick={() => onUpdate(pickGroup(state, gk, tm.n))}
+                  <button key={tm.n} disabled={locked} onClick={() => onUpdate(doGroupPick(state, gk, tm.n))}
                     style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'10px 14px', textAlign:'left', border:'none', borderTop:idx>0?'1px solid var(--line)':'none', background:is1?'color-mix(in srgb,var(--gold) 8%,var(--surface))':is2?'color-mix(in srgb,var(--ink) 4%,var(--surface))':'var(--surface)', cursor:locked?'default':'pointer', transition:'background .12s' }}>
                     <Flag iso={isoForTeam(tm.c)} size={22} radius={5} ring={false} alt={tm.n} />
                     <span style={{ flex:1, fontFamily:'var(--f-body)', fontWeight:600, fontSize:14, color:'var(--ink)' }}>{tm.n}</span>
@@ -285,12 +291,13 @@ function GroupsTab({ state, locked, onUpdate, onNext, results }: { state:Bracket
 
 // ── THIRD PLACE TAB ────────────────────────────────────────────────────────────
 
-function ThirdTab({ state, locked, onUpdate, onNext, onToast, results }: { state:BracketState; locked:boolean; onUpdate:(s:BracketState)=>void; onNext:()=>void; onToast:(m:string)=>void; results?: TournamentResults | null }) {
+function ThirdTab({ state, mode, locked, onUpdate, onNext, onToast, results }: { state:BracketState; mode:BracketMode; locked:boolean; onUpdate:(s:BracketState)=>void; onNext:()=>void; onToast:(m:string)=>void; results?: TournamentResults | null }) {
   const done = thirdComplete(state)
+  const doThirdPick = mode === 'pickem' ? pickThirdPickem : pickThird
 
   function handlePick(gk: string, nm: string) {
     if (state.tp[gk]!==nm && state.tq.length>=8 && !state.tq.includes(nm)) { onToast('Already 8 — remove one first'); return }
-    onUpdate(pickThird(state, gk, nm))
+    onUpdate(doThirdPick(state, gk, nm))
   }
 
   return (
@@ -549,6 +556,129 @@ function MatchNode({ home, away, pick, locked, isFinal, onPick, actualWinner }: 
   )
 }
 
+// ── SURVIVOR TAB (Pick'em) ──────────────────────────────────────────────────────
+// Pick WHICH teams advance each round, narrowing your own pool — no matchups, so a
+// missed group pick never cascades. 32 → 16 → 8 → 4 → 2 → champion.
+
+const SURVIVOR_ROUNDS: { key: SurvivorRound; reach: string }[] = [
+  { key:'r32',   reach:'Round of 16' },
+  { key:'r16',   reach:'Quarter-finals' },
+  { key:'qf',    reach:'Semi-finals' },
+  { key:'sf',    reach:'Final' },
+  { key:'final', reach:'Champion' },
+]
+
+function SurvivorTab({ state, locked, bracketOpen, onUpdate, onComplete, results }: {
+  state:BracketState; locked:boolean; bracketOpen:boolean
+  onUpdate:(s:BracketState)=>void; onComplete:()=>void; results?: TournamentResults | null
+}) {
+  if (!bracketOpen) {
+    return (
+      <div style={{ padding:'48px 24px', textAlign:'center', background:'var(--surface)', border:'1px solid var(--line)', borderRadius:20 }}>
+        <div style={{ fontSize:40, marginBottom:12 }}>🗂</div>
+        <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:20, color:'var(--ink)', marginBottom:8 }}>Complete your group picks first</div>
+        <p style={{ fontFamily:'var(--f-body)', fontSize:14, color:'var(--ink-2)', maxWidth:360, margin:'0 auto' }}>
+          Pick 1st and 2nd in all 12 groups (plus your 8 third-place qualifiers) to fill your pool of 32. Then choose which teams advance each round.
+        </p>
+      </div>
+    )
+  }
+
+  const poolReady = survivorCandidates(state, 'r32').length
+
+  return (
+    <div>
+      <div style={{ margin:'0 0 16px', padding:'12px 16px', background:'color-mix(in srgb,var(--accent) 6%,var(--surface))', border:'1px solid color-mix(in srgb,var(--accent) 22%,var(--line))', borderRadius:14 }}>
+        <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:15, color:'var(--ink)' }}>Pick who advances — no matchups</div>
+        <div style={{ fontFamily:'var(--f-body)', fontSize:12.5, color:'var(--ink-2)', marginTop:2, lineHeight:1.5 }}>
+          From your {poolReady} qualifiers, narrow the field each round: 16 → 8 → 4 → 2 → champion. A team only has to <em>reach</em> the round — who they play doesn&rsquo;t matter, so a missed group pick never breaks your bracket.
+        </div>
+      </div>
+
+      <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        {SURVIVOR_ROUNDS.map((r, ri) => {
+          const cands = survivorCandidates(state, r.key)
+          const picks = survivorPicks(state, r.key)
+          const pickSet = new Set(picks)
+          const cap = SURVIVOR_COUNTS[r.key]
+          const actuals = getActuals(results, r.key)
+          const hasRes = actuals.some(Boolean)
+          const correct = hasRes ? picks.filter(nm => knockoutPickCorrect(nm, 0, actuals, true) === true).length : 0
+          const full = picks.length >= cap
+          const prevEmpty = cands.length === 0
+
+          return (
+            <div key={r.key} style={{ background:'var(--surface)', border: full ? '1.5px solid color-mix(in srgb,var(--accent) 35%,var(--line))' : '1px solid var(--line)', borderRadius:16, overflow:'hidden' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'11px 14px', background:'var(--surface-2)', borderBottom:'1px solid var(--line)' }}>
+                <div>
+                  <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:16, color:'var(--ink)' }}>{r.reach}</div>
+                  <div style={{ fontFamily:'var(--f-mono)', fontSize:9.5, color:'var(--ink-3)', letterSpacing:'0.4px', marginTop:1 }}>
+                    {r.key==='final' ? 'PICK YOUR CHAMPION' : `PICK ${cap} TO REACH THE ${r.reach.toUpperCase()}`}
+                  </div>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  {hasRes && <span style={{ fontFamily:'var(--f-mono)', fontSize:10, fontWeight:700, color:'var(--win)' }}>{correct}/{cap}</span>}
+                  <span style={{ fontFamily:'var(--f-mono)', fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:10, background: full ? 'color-mix(in srgb,var(--accent) 14%,transparent)' : 'var(--surface)', color: full ? 'var(--accent)' : 'var(--ink-3)', border: full ? 'none' : '1px solid var(--line)' }}>
+                    {picks.length}/{cap}
+                  </span>
+                </div>
+              </div>
+
+              {prevEmpty ? (
+                <div style={{ padding:'16px', fontFamily:'var(--f-body)', fontSize:12.5, color:'var(--ink-3)', textAlign:'center' }}>
+                  Pick your {SURVIVOR_ROUNDS[ri-1]?.reach ?? 'qualifiers'} first.
+                </div>
+              ) : (
+                <div style={{ padding:'12px', display:'flex', flexWrap:'wrap', gap:7 }}>
+                  {cands.map(nm => {
+                    const t = teamByName(nm)
+                    const on = pickSet.has(nm)
+                    const verdict = on && hasRes ? knockoutPickCorrect(nm, 0, actuals, true) : null
+                    const disabled = locked || (!on && full && cap > 1)
+                    const bg = verdict === true ? 'color-mix(in srgb,var(--win) 14%,var(--surface))'
+                      : verdict === false ? 'color-mix(in srgb,var(--live) 10%,var(--surface))'
+                      : on ? 'var(--accent)' : 'var(--surface)'
+                    const fg = verdict === true ? 'var(--win)' : verdict === false ? 'var(--live)' : on ? '#fff' : 'var(--ink)'
+                    const bd = verdict === true ? 'color-mix(in srgb,var(--win) 35%,var(--line))'
+                      : verdict === false ? 'color-mix(in srgb,var(--live) 30%,var(--line))'
+                      : on ? 'var(--accent)' : 'var(--line)'
+                    return (
+                      <button key={nm} disabled={disabled}
+                        onClick={() => { const next = toggleSurvivor(state, r.key, nm); onUpdate(next); if (r.key==='final' && next.final) onComplete() }}
+                        style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'7px 11px', borderRadius:11,
+                          border:`${on && verdict===null ? '1.5px' : '1px'} solid ${bd}`, background:bg, color:fg,
+                          cursor:disabled?'default':'pointer', opacity: disabled && !on ? 0.4 : 1,
+                          fontFamily:'var(--f-body)', fontWeight:600, fontSize:13, transition:'all .12s' }}>
+                        <span style={{ fontSize:15 }}>{t.f}</span>
+                        <span>{nm}</span>
+                        {verdict===true && <span style={{ fontFamily:'var(--f-mono)', fontSize:11, fontWeight:800 }}>✓</span>}
+                        {verdict===false && <span style={{ fontFamily:'var(--f-mono)', fontSize:11, fontWeight:800 }}>✗</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {state.final && (
+        <div style={{ marginTop:18, padding:'24px 20px', background:'linear-gradient(135deg,color-mix(in srgb,var(--gold) 12%,var(--surface)),color-mix(in srgb,var(--gold) 4%,var(--surface)))', border:'1.5px solid color-mix(in srgb,var(--gold) 35%,var(--line))', borderRadius:20, textAlign:'center' }}>
+          <div style={{ fontSize:52, marginBottom:8 }}>{teamByName(state.final).f}</div>
+          <div style={{ fontFamily:'var(--f-mono)', fontSize:10, letterSpacing:'2px', color:'var(--gold)', fontWeight:700, marginBottom:6 }}>YOUR CHAMPION</div>
+          <div style={{ fontFamily:'var(--f-cond)', fontWeight:800, fontSize:28, color:'var(--ink)' }}>{state.final}</div>
+          {!locked && (
+            <button onClick={onComplete} className="btn-primary" style={{ marginTop:16, padding:'11px 24px', fontSize:14, fontWeight:700 }}>
+              Review &amp; submit →
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── SUMMARY TAB ────────────────────────────────────────────────────────────────
 
 function ResultBadge({ pick, actual }: { pick: string | null | undefined; actual: string | null | undefined }) {
@@ -566,28 +696,29 @@ function SummaryTab({ state, mode, onGoTo, results, groupLocked, bracketLocked, 
   const groupsDone = groupsComplete(state)
   const thirdDone  = thirdComplete(state)
   const groupPhaseDone = groupsDone && thirdDone
-  const knockoutDone = !!state.final
+  const knockoutDone = mode === 'pickem' ? survivorComplete(state) : !!state.final
   const bracketPicks = [...state.r32,...state.r16,...state.qf,...state.sf,state.final].filter(Boolean).length
   const doneCount = GROUP_KEYS.filter(gk => state.gp[gk]?.first && state.gp[gk]?.second).length
   const hasResults = !!results
 
-  // Shared scoring engine — identical to the server (lib/bracket-scoring.ts)
-  const score = results ? scoreBracketEntry(stateToDb(state), results) : null
-
-  // Scoring tallies
-  const groupCorrect = results ? GROUP_KEYS.reduce((acc, gk) => {
-    if (state.gp[gk]?.first  === results.group_results[gk]?.first)  acc++
-    if (state.gp[gk]?.second === results.group_results[gk]?.second) acc++
-    return acc
-  }, 0) : 0
-  const thirdCorrect = results ? state.tq.filter(nm => results.third_quals.includes(nm)).length : 0
-  const r32Correct  = results ? state.r32.filter((p,i) => p && p === results.r32_results[i]).length : 0
-  const r16Correct  = results ? state.r16.filter((p,i) => p && p === results.r16_results[i]).length : 0
-  const qfCorrect   = results ? state.qf.filter((p,i)  => p && p === results.qf_results[i]).length  : 0
-  const sfCorrect   = results ? state.sf.filter((p,i)  => p && p === results.sf_results[i]).length  : 0
-  const champCorrect = results && state.final && state.final === results.final_result ? 1 : 0
-
   const isPickem = mode === 'pickem'
+
+  // Shared scoring engine — identical to the server (lib/bracket-scoring.ts).
+  // Mode-aware: pickem scores knockout picks by survivor set-membership, reset by
+  // bracket position.
+  const score = results ? scoreBracketEntry(stateToDb(state), results, mode) : null
+
+  // Scoring tallies — knockout counts come straight from the (mode-aware) breakdown
+  // so they never drift from the points shown.
+  const bd = (k: string) => score?.breakdown.find(r => r.key === k)
+  const groupCorrect = bd('groups')?.correct ?? 0
+  const thirdCorrect = bd('third')?.correct ?? 0
+  const r32Correct  = bd('r32')?.correct ?? 0
+  const r16Correct  = bd('r16')?.correct ?? 0
+  const qfCorrect   = bd('qf')?.correct ?? 0
+  const sfCorrect   = bd('sf')?.correct ?? 0
+  const champCorrect = bd('final')?.correct ?? 0
+
   const firstIncompleteGroup: Tab = !groupsDone ? 'groups' : 'third'
   const groupSectionsDone = [groupsDone, thirdDone].filter(Boolean).length
   const firstIncomplete: Tab = !groupsDone ? 'groups' : !thirdDone ? 'third' : 'bracket'
@@ -785,10 +916,10 @@ function SummaryTab({ state, mode, onGoTo, results, groupLocked, bracketLocked, 
           </div>
           <div style={{ padding:'12px 16px', display:'flex', flexDirection:'column', gap:14 }}>
             {[
-              { label:'Round of 32', picks:state.r32, actuals: results?.r32_results, correct: r32Correct, total: 16 },
-              { label:'Round of 16', picks:state.r16, actuals: results?.r16_results, correct: r16Correct, total: 8 },
-              { label:'Quarterfinals', picks:state.qf, actuals: results?.qf_results, correct: qfCorrect, total: 4 },
-              { label:'Semifinals', picks:state.sf, actuals: results?.sf_results, correct: sfCorrect, total: 2 },
+              { label: isPickem?'Round of 16':'Round of 32', picks:state.r32, actuals: results?.r32_results, correct: r32Correct, total: 16 },
+              { label: isPickem?'Quarter-finals':'Round of 16', picks:state.r16, actuals: results?.r16_results, correct: r16Correct, total: 8 },
+              { label: isPickem?'Semi-finals':'Quarterfinals', picks:state.qf, actuals: results?.qf_results, correct: qfCorrect, total: 4 },
+              { label: isPickem?'Final':'Semifinals', picks:state.sf, actuals: results?.sf_results, correct: sfCorrect, total: 2 },
             ].map(({ label, picks, actuals, correct, total }) => {
               const made = picks.map((p, i) => ({ nm: p, i })).filter(x => x.nm)
               if (!made.length) return null
@@ -801,7 +932,7 @@ function SummaryTab({ state, mode, onGoTo, results, groupLocked, bracketLocked, 
                   <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
                     {made.map(({ nm, i }) => {
                       const t = teamByName(nm!)
-                      const isCorrect = actuals ? (nm === actuals[i] ? true : actuals[i] ? false : null) : null
+                      const isCorrect = knockoutPickCorrect(nm!, i, actuals, isPickem)
                       return (
                         <span key={`${nm}-${i}`} style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'3px 9px', borderRadius:14,
                           background: isCorrect === true ? 'color-mix(in srgb,var(--win) 10%,var(--surface-2))' : isCorrect === false ? 'color-mix(in srgb,var(--live) 8%,var(--surface-2))' : 'var(--surface-2)',

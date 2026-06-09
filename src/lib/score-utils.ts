@@ -47,8 +47,9 @@ export async function scoreBrackets(
   // Picks / Bracket(=pickem+reset) / Total. Per-mode points are shown in the UI.
   const byUser = new Map<string, { points: number; correct: number }>()
   for (const entry of entries) {
-    // Single source of truth for point values (GDD §2.2): see lib/bracket-scoring.ts
-    const { points, correct } = scoreBracketEntry(entry, res)
+    // Single source of truth for point values (GDD §2.2): see lib/bracket-scoring.ts.
+    // pickem scores by survivor set-membership, reset by bracket position.
+    const { points, correct } = scoreBracketEntry(entry, res, entry.mode === 'pickem' ? 'pickem' : 'reset')
     const cur = byUser.get(entry.user_id) ?? { points: 0, correct: 0 }
     cur.points += points
     cur.correct += correct

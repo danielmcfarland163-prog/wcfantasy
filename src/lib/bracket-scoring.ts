@@ -82,15 +82,28 @@ function arr(x: (string | null)[] | null | undefined): (string | null)[] {
   return Array.isArray(x) ? x : []
 }
 
+export type BracketScoringMode = 'pickem' | 'reset'
+
 /**
  * Score a single bracket entry against the (possibly partial) tournament results.
  * Rounds with no results yet simply contribute 0 — there is no penalty for
  * future rounds that haven't been played.
+ *
+ * Two scoring shapes, by mode:
+ *   reset  — knockout picks are matchup winners; scored by bracket POSITION
+ *            (pick[i] === actual[i]).
+ *   pickem — knockout picks are a SURVIVOR POOL ("these teams reach this round"),
+ *            scored by SET MEMBERSHIP (the picked team is anywhere in that round's
+ *            actual advancer set), independent of matchup. A missed group pick can
+ *            no longer cascade through a bracket of fixed matchups.
+ * Point values, totals and the 231 max are identical for both modes.
  */
 export function scoreBracketEntry(
   entry: BracketEntryLike,
   results: TournamentResultsLike | null | undefined,
+  mode: BracketScoringMode = 'reset',
 ): BracketScore {
+  const isPickem = mode === 'pickem'
   const gp = entry.group_picks ?? {}
   const gr = results?.group_results ?? {}
   const groupKeys = Object.keys(gr)
@@ -118,6 +131,9 @@ export function scoreBracketEntry(
   const thirdPoints = third * BRACKET_PTS.third
 
   // ── Knockout rounds ──
+  // reset  → positional (pick[i] === actual[i]).
+  // pickem → set membership: how many of the picked teams are anywhere in this
+  //          round's actual advancer set (dedup'd; matchup-independent).
   const scoreRound = (
     picks: (string | null)[] | null | undefined,
     actuals: (string | null)[] | null | undefined,
@@ -125,11 +141,23 @@ export function scoreBracketEntry(
   ): { correct: number; points: number; hasResults: boolean } => {
     const p = arr(picks)
     const a = arr(actuals)
+    const hasResults = a.some(Boolean)
     let correct = 0
-    p.forEach((pick, i) => {
-      if (pick && a[i] && pick === a[i]) correct++
-    })
-    return { correct, points: correct * ptVal, hasResults: a.some(Boolean) }
+    if (isPickem) {
+      const actualSet = new Set(a.filter(Boolean) as string[])
+      const seen = new Set<string>()
+      for (const pick of p) {
+        if (pick && !seen.has(pick) && actualSet.has(pick)) {
+          correct++
+          seen.add(pick)
+        }
+      }
+    } else {
+      p.forEach((pick, i) => {
+        if (pick && a[i] && pick === a[i]) correct++
+      })
+    }
+    return { correct, points: correct * ptVal, hasResults }
   }
 
   const r32 = scoreRound(entry.r32_picks, results?.r32_results, BRACKET_PTS.r32)
@@ -157,14 +185,20 @@ export function scoreBracketEntry(
   const picksMade =
     groupsFilled + arr(entry.third_quals).filter(Boolean).length + knockoutFilled + (entry.final_pick ? 1 : 0)
 
+  // In pickem the knockout picks name the teams that REACH each round, so the
+  // labels read one round "ahead" of the matchup (reset) framing.
+  const koLabels = isPickem
+    ? { r32: 'Round of 16', r16: 'Quarter-finals', qf: 'Semi-finals', sf: 'Final', final: 'Champion' }
+    : { r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarter-finals', sf: 'Semi-finals', final: 'Final' }
+
   const breakdown: BreakdownRow[] = [
     { key: 'groups', label: 'Group stage', correct: groupsCorrect, total: BRACKET_TOTALS.groups, points: groupsPoints, hasResults: groupsHasResults },
     { key: 'third', label: '3rd-place', correct: third, total: BRACKET_TOTALS.third, points: thirdPoints, hasResults: thirdHasResults },
-    { key: 'r32', label: 'Round of 32', correct: r32.correct, total: BRACKET_TOTALS.r32, points: r32.points, hasResults: r32.hasResults },
-    { key: 'r16', label: 'Round of 16', correct: r16.correct, total: BRACKET_TOTALS.r16, points: r16.points, hasResults: r16.hasResults },
-    { key: 'qf', label: 'Quarter-finals', correct: qf.correct, total: BRACKET_TOTALS.qf, points: qf.points, hasResults: qf.hasResults },
-    { key: 'sf', label: 'Semi-finals', correct: sf.correct, total: BRACKET_TOTALS.sf, points: sf.points, hasResults: sf.hasResults },
-    { key: 'final', label: 'Final', correct: championCorrect, total: BRACKET_TOTALS.final, points: finalPoints, hasResults: finalHasResults },
+    { key: 'r32', label: koLabels.r32, correct: r32.correct, total: BRACKET_TOTALS.r32, points: r32.points, hasResults: r32.hasResults },
+    { key: 'r16', label: koLabels.r16, correct: r16.correct, total: BRACKET_TOTALS.r16, points: r16.points, hasResults: r16.hasResults },
+    { key: 'qf', label: koLabels.qf, correct: qf.correct, total: BRACKET_TOTALS.qf, points: qf.points, hasResults: qf.hasResults },
+    { key: 'sf', label: koLabels.sf, correct: sf.correct, total: BRACKET_TOTALS.sf, points: sf.points, hasResults: sf.hasResults },
+    { key: 'final', label: koLabels.final, correct: championCorrect, total: BRACKET_TOTALS.final, points: finalPoints, hasResults: finalHasResults },
   ]
 
   return { points, correct, championCorrect, picksMade, breakdown }
@@ -174,3 +208,25 @@ export function scoreBracketEntry(
 //   groups 24×2=48 · third 8×2=16 · r32 16×3=48 · r16 8×5=40
 //   qf 4×8=32 · sf 2×13=26 · final 1×21=21  →  TOTAL 231
 export const BRACKET_MAX_POINTS = 231
+
+/**
+ * Whether a single knockout pick should render as correct (✓), wrong (✗) or
+ * undecided (null) — mode-aware, for the summary / reviewer chip displays.
+ *   reset  → positional: the team that actually won this exact slot.
+ *   pickem → membership: the team appears anywhere in the round's advancer set.
+ *            Stays `null` (pending) until the round is fully decided, so a team
+ *            whose match hasn't happened yet isn't prematurely marked wrong.
+ */
+export function knockoutPickCorrect(
+  nm: string,
+  slot: number,
+  actuals: (string | null)[] | null | undefined,
+  isPickem: boolean,
+): boolean | null {
+  const a = actuals ?? []
+  if (isPickem) {
+    if (a.includes(nm)) return true
+    return a.length > 0 && a.every(Boolean) ? false : null
+  }
+  return a[slot] ? nm === a[slot] : null
+}

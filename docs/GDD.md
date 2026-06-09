@@ -45,11 +45,11 @@ Users predict the exact scoreline for every match before kickoff. Every match is
 
 ### 2.2 Bracket (Tournament Predictor)
 
-The Bracket game has **two independent modes** — players can play either or both, and each is scored separately on the same point values (below). Each pick sequence is the full bracket: group 1st/2nd (×12) → third-place qualifiers (8 of 12) → Round of 32 (16) → R16 (8) → QF (4) → SF (2) → Final (1).
+The Bracket game has **two independent modes** — players can play either or both, and each is scored separately on the same point values (below). Both predict group 1st/2nd (×12) and the third-place qualifiers (8 of 12) up front; they differ in how the **knockout** is predicted and scored.
 
-**Mode A — Up-Front Pick'em.** Fill the *entire* bracket before the tournament. The knockout is seeded from the player's **own predicted groups** — a wrong group call cascades through the bracket, classic-pool style. Everything locks as one snapshot at the first match kickoff (the *group lock*, June 11, 2026 15:00 UTC).
+**Mode A — Up-Front Pick'em (survivor pool).** Fill the *entire* bracket before the tournament, but as a **survivor pool, not a matchup bracket**: from your 32 predicted qualifiers you select which **16 reach the Round of 16**, then **8** of those reach the QF, **4** the SF, **2** the Final, and **1** champion — each round a subset of the last. Picks are **independent of matchup** and scored by **set membership** (did a selected team actually reach that round), so a missed group pick can no longer cascade through a fixed bracket of matchups — it only costs the points for that one team. Everything locks as one snapshot at the first match kickoff (the *group lock*, June 11, 2026 15:00 UTC). Stored in the same `r32/r16/qf/sf/final` columns as **sets**; see `prunePickemSurvivors` / `toggleSurvivor` in `lib/bracket.ts`.
 
-**Mode B — Bracket Reset.** Group 1st/2nd + third-place qualifiers are predicted up front and lock at the group lock. The knockout then **re-opens**, seeded from the **actual** Round of 32 (everyone fills out the same real bracket), and locks at the R32 kickoff (the *knockout lock*, June 28, 2026 19:00 UTC).
+**Mode B — Bracket Reset.** *(Unchanged.)* Group 1st/2nd + third-place qualifiers are predicted up front and lock at the group lock. The knockout then **re-opens**, seeded from the **actual** Round of 32 (everyone fills out the same real bracket of matchup winners, scored by **bracket position**), and locks at the R32 kickoff (the *knockout lock*, June 28, 2026 19:00 UTC).
 
 Lock times are configurable via `NEXT_PUBLIC_BRACKET_LOCK` (group) and `NEXT_PUBLIC_KNOCKOUT_LOCK` (knockout). Each mode is one row in `bracket_entries`, keyed by `(user_id, mode)`. Reset's knockout unlocks automatically once `tournament_results` shows all 12 groups decided and the 8 third-place qualifiers known (`groupResultsComplete()`); per-mode seeding + locks live in `src/lib/bracket.ts`. Server-side, the trigger `enforce_bracket_phase_locks` freezes group columns at the group lock for both modes, and knockout columns at the **group** lock for pickem / the **knockout** lock for reset.
 
@@ -65,7 +65,7 @@ Lock times are configurable via `NEXT_PUBLIC_BRACKET_LOCK` (group) and `NEXT_PUB
 | Semi-final correct winner | 13 pts |
 | Final correct winner (champion) | 21 pts |
 
-> Implemented and verified (2026-06-06): these exact values live in `src/lib/bracket-scoring.ts`, the single source of truth shared by `api/score-bracket` and the bracket UI. Theoretical max = **231 pts per mode** (groups 48 · 3rd 16 · R32 48 · R16 40 · QF 32 · SF 26 · Final 21).
+> These exact values live in `src/lib/bracket-scoring.ts`, the single source of truth shared by `api/score-bracket` and the bracket UI. `scoreBracketEntry(entry, results, mode)` is **mode-aware**: `pickem` scores knockout picks by **set membership** (the team is anywhere in that round's actual advancer set), `reset` by **bracket position**. Both use the same point values and totals. Theoretical max = **231 pts per mode** (groups 48 · 3rd 16 · 16×3=48 · 8×5=40 · 4×8=32 · 2×13=26 · champion 21).
 
 **Results populate to:** `bracket_entries` (one row per user **per mode**), `tournament_results` (admin-maintained actuals), and `global_scores` / `league_scores.bracket_points` — which hold the **sum of both modes** (Total = Picks + Pick'em + Reset). Per-mode points are shown in the bracket UI and the player summary; `scoreBrackets()` aggregates the two entries per user.
 
@@ -129,7 +129,7 @@ Tapping a row opens that member's read-only **player summary** (`/leagues/[id]/p
 
 ### Filling the Bracket
 1. Go to `/bracket` and pick a mode — **Up-Front Pick'em** or **Bracket Reset** (toggle at the top; each is its own game with its own score).
-2. **Pick'em:** fill the whole bracket (groups → 3rd → knockout, self-seeded from your groups) before June 11; it all locks at the first kickoff.
+2. **Pick'em:** predict groups + 3rd place, then narrow your 32 qualifiers down the survivor pool (16 → 8 → 4 → 2 → champion) — pick who *advances*, not who beats whom — before June 11; it all locks at the first kickoff.
 3. **Reset:** pick groups + 3rd before June 11; after the group stage the knockout re-opens seeded from the real Round of 32 and locks June 28.
 4. Each mode becomes read-only at its lock; scores populate as results come in.
 

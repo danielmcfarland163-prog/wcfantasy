@@ -110,9 +110,14 @@ export interface ChatMessage {
 
 export interface BracketEntry {
   user_id: string
+  // Which bracket game this row belongs to. pickem = survivor-pool (set scoring);
+  // reset = matchup bracket re-seeded from the real R32 (positional scoring).
+  mode?: 'pickem' | 'reset'
   group_picks: Record<string, { first: string | null; second: string | null }>
   third_picks: Record<string, string | null>
   third_quals: string[]
+  // For pickem these arrays are SETS (the teams that reach each round); for reset
+  // they are positional matchup winners. Lengths: 16 / 8 / 4 / 2 / 1.
   r32_picks: (string | null)[]
   r16_picks: (string | null)[]
   qf_picks: (string | null)[]

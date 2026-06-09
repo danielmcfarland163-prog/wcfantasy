@@ -173,9 +173,10 @@ export default function HowToPlayPage() {
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
             <ModeCard tag="Mode A · one lock" tagColor="var(--accent)" title="Up-Front Pick&rsquo;em">
-              Fill out the <strong style={{ color: 'var(--ink)' }}>entire</strong> bracket before a ball is kicked.
-              Your knockout rounds are seeded from <em>your own</em> predicted groups — get a group wrong and it
-              cascades down your bracket. Everything locks together at the first match.
+              A <strong style={{ color: 'var(--ink)' }}>survivor pool</strong>, filled before a ball is kicked. From your
+              32 qualifiers you pick who <em>advances</em> each round — 16 reach the Round of 16, then 8, 4, 2,
+              and your champion. No matchups, so a missed group pick never cascades; a team just has to get there.
+              Locks at the first match.
             </ModeCard>
             <ModeCard tag="Mode B · two stages" tagColor="var(--win)" title="Bracket Reset">
               Predict group finishes and third-place qualifiers up front. Once the group stage is done, the
@@ -204,8 +205,9 @@ export default function HowToPlayPage() {
           }}>
             <span style={{ fontSize: 18 }}>🎯</span>
             <span style={{ fontFamily: 'var(--f-body)', fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.5 }}>
-              A flawless bracket is worth <strong style={{ color: 'var(--ink)' }}>231 points</strong>. Each mode is scored
-              on its own, so playing both is two separate shots at a perfect run.
+              A flawless bracket is worth <strong style={{ color: 'var(--ink)' }}>231 points</strong>. In Up-Front
+              Pick&rsquo;em you earn a round&rsquo;s points for every team that <em>reaches</em> it; in Bracket Reset, for
+              every correct matchup winner. Each mode is scored on its own, so playing both is two shots at a perfect run.
             </span>
           </div>
         </Section>
