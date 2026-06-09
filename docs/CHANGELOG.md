@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+### Fix: invite links 404 (`/join/[code]` route added) (2026-06-08)
+
+- **Symptom.** Clicking a copied league invite (`…/soccer-fantasy/join/<CODE>` from `generateInviteUrl`) 404'd — the route never existed, though `/join` was already whitelisted in middleware. Joining only worked via the manual code box (`POST /api/join-league`).
+- **Fix.** New `src/app/join/[code]/page.tsx` (server component): looks the league up by code with the service-role client (non-members can't SELECT a private league), then — for a signed-in, onboarded user — checks capacity, inserts the membership (idempotent: `23505` / existing-member both fall through), seeds the `league_scores` row, and redirects to `/leagues/[id]`. Friendly cards for invalid code, full league, or unconfigured service key (no raw 404/500).
+- **Logged-out & brand-new invitees.** `/join/[code]` bounces un-signed-in visitors to `/auth/login?next=/join/<CODE>` and un-onboarded ones to `/auth/onboarding?next=…`, so the invite resolves after auth. Added an **open-redirect-safe `next`** (same-origin, app-relative) threaded through: login (password `router.push(next)` + magic-link/signup `emailRedirectTo` carry `next`), the auth callback (now prepends basePath and forwards `next` into onboarding), and onboarding (page reads `searchParams.next`, form pushes to it on completion).
+- **No schema change.** Reuses `league_members` / `league_scores`; same join semantics as `/api/join-league`.
+- **Verification.** New route transpiles clean; the four edited auth files confirmed well-formed via the file reader (sandbox mount still serves truncated copies, so `tsc`/`vitest` can't run here). Trace covered: logged-in join, already-member, invalid code, full league, logged-out → login → join, and new signup → onboarding → join. Run `npm run build` on the host to confirm types.
+
 ### Up-Front Pick'em → survivor pool (no knockout cascade) (2026-06-08)
 
 - **Why.** In Pick'em the knockout was a matchup bracket seeded from the player's own predicted groups, so one wrong group call cascaded through every downstream matchup. Pick'em is now a **survivor pool**: you pick *which teams advance* each round, independent of who they play, so a missed group pick only costs that team's points. **Bracket Reset is unchanged.**

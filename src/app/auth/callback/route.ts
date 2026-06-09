@@ -35,9 +35,13 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
       const onboarded = data.session?.user?.user_metadata?.onboarded === true
+      // `next` is an app-relative path (no basePath), kept same-origin to avoid
+      // open redirects. Carry it through onboarding so invite links resolve even
+      // for brand-new signups.
+      const safe = next && next.startsWith('/') && !next.startsWith('//') ? next : null
       const dest = !onboarded
-        ? `${BASE}/auth/onboarding`
-        : next ?? `${BASE}/today`
+        ? `${BASE}/auth/onboarding${safe ? `?next=${encodeURIComponent(safe)}` : ''}`
+        : `${BASE}${safe ?? '/today'}`
       return NextResponse.redirect(`${origin}${dest}`)
     }
   }

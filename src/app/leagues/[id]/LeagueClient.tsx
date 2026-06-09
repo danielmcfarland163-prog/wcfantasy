@@ -116,7 +116,7 @@ export default function LeagueClient({ league, scores, currentUserId, currentPro
             <div style={{ fontFamily: 'var(--f-mono)', fontSize: 8.5, letterSpacing: '1px', color: 'rgba(255,255,255,0.45)', marginBottom: 2 }}>INVITE CODE</div>
             <div style={{ fontFamily: 'var(--f-mono)', fontSize: 17, fontWeight: 700, color: '#fff', letterSpacing: 3 }}>{league.invite_code}</div>
           </div>
-          <CopyInviteButton inviteUrl={inviteUrl} />
+          <CopyInviteButton inviteUrl={inviteUrl} inviteCode={league.invite_code} />
         </div>
       </div>
 

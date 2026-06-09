@@ -37,10 +37,16 @@ export default function LoginPage() {
     setError('')
     setMessage('')
     try {
+      // Optional return path (e.g. an invite link sends ?next=/join/CODE). Kept
+      // app-relative and same-origin to avoid open redirects; forwarded through
+      // the email callback so magic-link / signup land back on it too.
+      const next = safeNext()
+      const callbackUrl = `${window.location.origin}${CALLBACK}${next ? `?next=${encodeURIComponent(next)}` : ''}`
+
       if (mode === 'magic') {
         const { error } = await supabase.auth.signInWithOtp({
           email,
-          options: { emailRedirectTo: `${window.location.origin}${CALLBACK}` },
+          options: { emailRedirectTo: callbackUrl },
         })
         if (error) throw error
         setMessage('Check your email for a one-tap login link. ✉️')
@@ -53,7 +59,7 @@ export default function LoginPage() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: `${window.location.origin}${CALLBACK}` },
+          options: { emailRedirectTo: callbackUrl },
         })
         if (error) throw error
         setMessage('Account created! Check your email to confirm, then you’ll pick a username.')
@@ -63,7 +69,7 @@ export default function LoginPage() {
       // Password sign-in
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      router.push('/today')
+      router.push(next ?? '/today')
       router.refresh()
     } catch (err: any) {
       setError(prettifyError(err?.message))
@@ -292,6 +298,13 @@ function Banner({ kind, children }: { kind: 'error' | 'success'; children: React
       {children}
     </p>
   )
+}
+
+// Same-origin, app-relative return path from ?next (open-redirect-safe).
+function safeNext(): string | null {
+  if (typeof window === 'undefined') return null
+  const raw = new URLSearchParams(window.location.search).get('next')
+  return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : null
 }
 
 function prettifyError(msg?: string): string {

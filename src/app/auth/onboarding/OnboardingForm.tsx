@@ -7,9 +7,10 @@ interface Props {
   userId: string
   email: string
   initialUsername: string
+  next?: string | null
 }
 
-export default function OnboardingForm({ userId, email, initialUsername }: Props) {
+export default function OnboardingForm({ userId, email, initialUsername, next }: Props) {
   const supabase = createClient()
   const router = useRouter()
   const [username, setUsername] = useState(initialUsername)
@@ -74,7 +75,7 @@ export default function OnboardingForm({ userId, email, initialUsername }: Props
         return
       }
 
-      router.push('/today')
+      router.push(next || '/today')
       router.refresh()
     } catch (err: any) {
       setError(err?.message ?? 'Something went wrong. Please try again.')
